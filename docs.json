@@ -2,9 +2,10 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "MergeWatch",
+  "appearance": { "default": "dark" },
   "logo": {
-    "dark": "/logo/dark.svg",
-    "light": "/logo/light.svg",
+    "dark": "/logo/wordmark-fit.png",
+    "light": "/logo/wordmark-fit.png",
     "href": "https://mergewatch.ai"
   },
   "favicon": "/favicon.svg",
@@ -17,7 +18,7 @@
     "links": [
       {
         "label": "GitHub",
-        "href": "https://github.com/mergewatch/mergewatch"
+        "href": "https://github.com/santthosh/mergewatch.ai"
       }
     ],
     "primary": {
@@ -104,7 +105,7 @@
       "anchors": [
         {
           "anchor": "GitHub",
-          "href": "https://github.com/mergewatch/mergewatch",
+          "href": "https://github.com/santthosh/mergewatch.ai",
           "icon": "github"
         },
         {
@@ -117,7 +118,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/mergewatch/mergewatch"
+      "github": "https://github.com/santthosh/mergewatch.ai"
     }
   }
 }
