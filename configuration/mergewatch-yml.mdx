@@ -1,0 +1,205 @@
+---
+title: ".mergewatch.yml Reference"
+description: "Complete reference for the .mergewatch.yml configuration file — properties, defaults, agents, and rules."
+---
+
+The `.mergewatch.yml` file controls how MergeWatch reviews pull requests in a repository. Place it at the root of your repository's default branch (usually `main`).
+
+## Configuration priority
+
+MergeWatch resolves configuration in the following order. Each layer overrides the one before it:
+
+<Steps>
+<Step title="Built-in defaults">
+  Hardcoded in the MergeWatch Lambda. These apply when no other configuration is present.
+</Step>
+<Step title="Installation-level settings (DynamoDB)">
+  Set via the [dashboard](/dashboard/settings). Apply to all repositories in the installation.
+</Step>
+<Step title="Per-repo .mergewatch.yml">
+  Checked into the repository. Overrides both built-in defaults and installation-level settings.
+</Step>
+</Steps>
+
+<Info>
+A `.mergewatch.yml` in the repository always wins. If you set `max_files: 100` in the dashboard but `max_files: 20` in the YAML file, the repo uses `20`.
+</Info>
+
+## Validation
+
+MergeWatch validates the `.mergewatch.yml` file on the first webhook it receives for the repository. If the file contains errors — invalid YAML, unknown properties, or type mismatches — MergeWatch posts the validation errors as a comment on the pull request so they are immediately visible to the author.
+
+## Full annotated example
+
+```yaml .mergewatch.yml
+version: 1
+
+# Model used for all agents. Must be a valid Bedrock model ID.
+model: anthropic.claude-sonnet-4-20250514
+
+# Agent configuration — enable, disable, or customize each agent.
+agents:
+  - name: security
+    enabled: true
+    prompt: "Flag OWASP Top 10 issues, hardcoded secrets, and unsafe deserialization."
+
+  - name: logic
+    enabled: true
+    prompt: "Find logic bugs, off-by-one errors, and race conditions."
+
+  - name: style
+    enabled: true
+    prompt: "Enforce project conventions. Be concise."
+
+  - name: tests
+    enabled: false
+    prompt: "Suggest missing unit tests for new public functions."
+
+# Review rules — control scope and trigger behavior.
+rules:
+  max_files: 50
+  ignore_patterns:
+    - "*.lock"
+    - "vendor/**"
+    - "dist/**"
+  auto_review: true
+  review_on_mention: true
+
+# How findings are posted: "inline" or "summary".
+comment_style: inline
+```
+
+## Property reference
+
+### Top-level properties
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `version` | `number` | `1` | Schema version. Currently only `1` is supported. |
+| `model` | `string` | `us.anthropic.claude-sonnet-4-20250514-v1:0` | Bedrock model ID used for all agents. Any model available in your Bedrock account can be specified. |
+| `light_model` | `string` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Lighter model used for low-complexity tasks such as summary generation. |
+| `max_tokens_per_agent` | `number` | `4096` | Maximum output tokens per agent invocation. Increase for large PRs; decrease to reduce cost. |
+| `comment_style` | `string` | `inline` | How findings are posted. `inline` posts review comments on specific lines. `summary` posts a single top-level comment. |
+| `min_severity` | `string` | `info` | Minimum severity level to report. One of `info`, `warning`, `error`, `critical`. Findings below this threshold are suppressed. |
+| `max_findings` | `number` | `25` | Maximum number of findings posted per review. Prevents noisy reviews on large PRs. |
+| `post_summary_on_clean` | `boolean` | `true` | When `true`, MergeWatch posts a summary comment even when no findings are detected. Set to `false` to stay silent on clean PRs. |
+| `agents` | `Agent[]` | See [Agents](#agents) | List of agent configurations. |
+| `rules` | `object` | See [Rules](#rules) | Review scope and trigger rules. |
+
+### Agents
+
+Each entry in the `agents` array configures one review agent. MergeWatch ships with four built-in agents.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `name` | `string` | — | Agent identifier. Built-in agents: `security`, `logic` (also called `bugs`), `style`, `summary`. |
+| `enabled` | `boolean` | `true` | Set to `false` to disable the agent entirely. |
+| `prompt` | `string` | Built-in prompt | Custom system prompt for the agent. Overrides the default prompt. Use this to tailor the agent to your project's conventions. |
+
+<Tip>
+You do not need to list all agents. Omitted agents use their built-in defaults with `enabled: true`. To disable a single agent, include only that agent with `enabled: false`.
+</Tip>
+
+**Default agent states:**
+
+| Agent | Default enabled | Purpose |
+|---|---|---|
+| `security` | `true` | OWASP Top 10, secrets detection, injection flaws, unsafe deserialization |
+| `logic` / `bugs` | `true` | Logic errors, off-by-one, null dereferences, race conditions |
+| `style` | `true` | Code style, naming conventions, project-specific patterns |
+| `summary` | `true` | High-level PR summary with risk rating |
+
+### Rules
+
+The `rules` object controls which files are reviewed and when reviews are triggered.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `max_files` | `number` | `50` | Maximum number of changed files to review. PRs exceeding this limit are skipped with a comment explaining why. |
+| `ignore_patterns` | `string[]` | `["*.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "dist/**", "node_modules/**"]` | Glob patterns for files to exclude from review. Matched against the file path relative to the repo root. |
+| `auto_review` | `boolean` | `true` | When `true`, MergeWatch reviews every PR automatically on open and synchronize events. |
+| `review_on_mention` | `boolean` | `true` | When `true`, MergeWatch runs a review when mentioned in a PR comment (e.g., `@mergewatch review`). Works even if `auto_review` is `false`. |
+
+## Minimal configuration
+
+If the defaults work for you, the smallest valid configuration is:
+
+```yaml .mergewatch.yml
+version: 1
+```
+
+This enables all four agents with their default prompts, uses Claude Sonnet via Bedrock, and reviews PRs automatically.
+
+## Common patterns
+
+<AccordionGroup>
+
+<Accordion title="Disable a single agent">
+```yaml .mergewatch.yml
+version: 1
+agents:
+  - name: style
+    enabled: false
+```
+All other agents remain enabled with their defaults.
+</Accordion>
+
+<Accordion title="Custom model with cost controls">
+```yaml .mergewatch.yml
+version: 1
+model: anthropic.claude-sonnet-4-20250514
+max_tokens_per_agent: 2048
+max_findings: 10
+min_severity: warning
+```
+Reduces output tokens, limits findings, and suppresses informational-level comments.
+</Accordion>
+
+<Accordion title="Review only on mention">
+```yaml .mergewatch.yml
+version: 1
+rules:
+  auto_review: false
+  review_on_mention: true
+```
+MergeWatch stays silent until someone comments `@mergewatch review` on the PR.
+</Accordion>
+
+<Accordion title="Ignore generated code and vendored dependencies">
+```yaml .mergewatch.yml
+version: 1
+rules:
+  ignore_patterns:
+    - "*.lock"
+    - "vendor/**"
+    - "dist/**"
+    - "generated/**"
+    - "*.pb.go"
+    - "*.gen.ts"
+```
+</Accordion>
+
+<Accordion title="Custom agent prompts for a specific project">
+```yaml .mergewatch.yml
+version: 1
+agents:
+  - name: security
+    enabled: true
+    prompt: "Focus on SQL injection and XSS. This is a Django project using raw queries in legacy modules."
+  - name: style
+    enabled: true
+    prompt: "Enforce PEP 8. Flag any use of print() — use logging instead."
+```
+</Accordion>
+
+</AccordionGroup>
+
+## Where the file lives
+
+The `.mergewatch.yml` file must be placed at the **root** of the repository's **default branch** (the branch GitHub shows when you visit the repo — usually `main` or `master`).
+
+MergeWatch reads the file from the default branch, not from the PR's head branch. This means configuration changes in a PR do not take effect until they are merged.
+
+<Warning>
+If you rename your default branch, MergeWatch automatically detects the new default on the next webhook. No action is required.
+</Warning>

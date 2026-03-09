@@ -1,0 +1,222 @@
+---
+title: "Bring Your Own Cloud"
+description: "Connect your own AWS Bedrock account to MergeWatch for full control over model inference, costs, and data residency."
+---
+
+MergeWatch's managed SaaS at [mergewatch.ai](https://mergewatch.ai) handles orchestration — receiving webhooks, processing diffs, and posting review comments. With BYOC, the actual LLM inference happens in **your** AWS account via Amazon Bedrock. You get the convenience of a managed service with the control and compliance posture of self-hosted inference.
+
+## How it works
+
+<Note>
+BYOC is available on the **Team** and **Enterprise** plans. Your MergeWatch dashboard must be active before you begin.
+</Note>
+
+The data flow with BYOC enabled:
+
+1. A pull request event fires a webhook to **MergeWatch's infrastructure**
+2. The MergeWatch Lambda fetches the PR diff from GitHub and processes it **in memory**
+3. MergeWatch assumes a cross-account IAM role in **your** AWS account via `sts:AssumeRole`
+4. The diff and agent prompts are sent to **Amazon Bedrock in your account** for inference
+5. The model response is returned to MergeWatch, which posts a review comment on GitHub
+
+```text
+GitHub ──webhook──▶ MergeWatch Lambda ──sts:AssumeRole──▶ Your AWS Account
+                     (processes diff         │                  │
+                      in memory)             │            Bedrock (inference)
+                                             │                  │
+                     posts review  ◀─────────┘◀─────────────────┘
+                     comment on PR
+```
+
+<Warning>
+Nothing beyond review metadata (timestamps, PR identifiers, review status) is persisted in MergeWatch infrastructure. The PR diff is held in Lambda memory only for the duration of the invocation and is never written to disk or stored in any MergeWatch database.
+</Warning>
+
+## Setup
+
+You can configure BYOC in two ways: a one-click CloudFormation stack or a manual IAM role.
+
+<Steps>
+
+<Step title="Option A: One-click CloudFormation deploy">
+
+The fastest path. Click the button below (or find it on your MergeWatch dashboard under **Settings > BYOC**) to launch the CloudFormation stack in your AWS account.
+
+The stack creates:
+
+- An IAM role with the correct trust policy and permissions
+- An external ID unique to your MergeWatch organization
+
+After the stack completes, the Role ARN is automatically sent back to MergeWatch. Skip to [Step 3](#test-the-connection) to verify.
+
+<Tip>
+The CloudFormation template is open source. Review it before deploying if your security team requires an audit.
+</Tip>
+
+</Step>
+
+<Step title="Option B: Create the IAM role manually">
+
+If you prefer to create the role yourself, follow the steps below.
+
+### 1. Create the trust policy
+
+The trust policy allows MergeWatch's AWS account to assume the role in your account. The `ExternalId` condition prevents [confused deputy attacks](#what-is-the-external-id).
+
+<CodeGroup>
+
+```json trust-policy.json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::MERGEWATCH_ACCOUNT_ID:root"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "YOUR_EXTERNAL_ID"
+        }
+      }
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+Replace the placeholders:
+
+| Placeholder | Where to find it |
+|---|---|
+| `MERGEWATCH_ACCOUNT_ID` | Shown on your MergeWatch dashboard under **Settings > BYOC** |
+| `YOUR_EXTERNAL_ID` | Generated for you on the same Settings page. Copy it exactly. |
+
+### 2. Create the permission policy
+
+Grant the role permission to invoke Bedrock foundation models. This is the only permission MergeWatch needs.
+
+<CodeGroup>
+
+```json bedrock-invoke-policy.json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": "arn:aws:bedrock:*::foundation-model/*"
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+<Tip>
+To restrict inference to a specific region, replace the `*` in the resource ARN with your preferred region (e.g., `us-east-1`). To restrict to a specific model, replace `foundation-model/*` with the model ID (e.g., `foundation-model/anthropic.claude-sonnet-4-20250514`).
+</Tip>
+
+### 3. Create the role
+
+<CodeGroup>
+
+```bash AWS CLI
+aws iam create-role \
+  --role-name MergeWatchBedrockRole \
+  --assume-role-policy-document file://trust-policy.json
+
+aws iam put-role-policy \
+  --role-name MergeWatchBedrockRole \
+  --policy-name BedrockInvokeAccess \
+  --policy-document file://bedrock-invoke-policy.json
+```
+
+</CodeGroup>
+
+Copy the Role ARN from the output. It looks like `arn:aws:iam::123456789012:role/MergeWatchBedrockRole`.
+
+</Step>
+
+<Step title="Paste the Role ARN into MergeWatch">
+
+1. Open your MergeWatch dashboard at [mergewatch.ai](https://mergewatch.ai)
+2. Navigate to **Settings > BYOC**
+3. Paste the IAM Role ARN
+4. Click **Save**
+
+</Step>
+
+<Step title="Test the connection">
+
+Click the **Test Connection** button on the Settings page. MergeWatch will attempt to assume the role and make a lightweight Bedrock call.
+
+A successful test confirms:
+
+- The trust policy is correct
+- The external ID matches
+- Bedrock model access is granted in your account
+
+<Warning>
+If the test fails, double-check that you have [requested model access](https://console.aws.amazon.com/bedrock/home#/modelaccess) for the Claude models in the Bedrock console. Model access must be explicitly enabled per region.
+</Warning>
+
+</Step>
+
+</Steps>
+
+## What is the External ID?
+
+The External ID is a shared secret between MergeWatch and your AWS account. It prevents a class of security issue known as the **confused deputy problem**.
+
+Without an External ID, any third party that knows your Role ARN could potentially trick MergeWatch into assuming the role on their behalf. The External ID ensures that only MergeWatch — with the correct ID value — can assume the role.
+
+- The External ID is generated by MergeWatch and is unique to your organization
+- It is included in every `sts:AssumeRole` call MergeWatch makes to your account
+- Your trust policy rejects any assume-role request that does not present the correct External ID
+- Never share your External ID publicly
+
+<Note>
+For a deeper explanation, see the [AWS documentation on the confused deputy problem](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html).
+</Note>
+
+## What data does Bedrock see?
+
+This is the most common question from compliance and security teams. The answer is straightforward:
+
+| Data sent to Bedrock | Data **not** sent to Bedrock |
+|---|---|
+| The PR diff (added/removed lines only) | Repository history or git log |
+| MergeWatch agent prompts (system + user) | Source code beyond the diff |
+| File paths included in the diff | Secrets, environment variables, or credentials |
+| PR title and description | Other PRs or branches |
+
+<Note>
+Because Bedrock runs in **your** AWS account, the data never leaves your AWS boundary during inference. MergeWatch acts only as the orchestrator — the model input and output travel directly between the MergeWatch Lambda and your Bedrock endpoint via the assumed role.
+</Note>
+
+All Bedrock API calls are logged in your own AWS CloudTrail, giving your security team full audit visibility over every inference request.
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Bedrock regions" icon="globe" href="/deployment/bedrock-regions">
+  See which AWS regions support the Bedrock models MergeWatch uses.
+</Card>
+
+<Card title="Review behavior" icon="sliders" href="/configuration/review-behavior">
+  Customize what MergeWatch looks for during code reviews.
+</Card>
+
+<Card title="Troubleshooting" icon="wrench" href="/reference/troubleshooting">
+  Common issues and fixes for BYOC and general deployments.
+</Card>
+
+<Card title="FAQ" icon="circle-question" href="/reference/faq">
+  Frequently asked questions about security, privacy, and billing.
+</Card>
+
+</CardGroup>

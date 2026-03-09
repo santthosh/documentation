@@ -1,0 +1,96 @@
+---
+title: "Permissions Explained"
+description: "Exactly what MergeWatch requests, why it needs each permission, and what it deliberately does not request."
+---
+
+MergeWatch follows the principle of least privilege. Every permission below is the minimum required for the app to function. This page is written for security teams evaluating MergeWatch for enterprise adoption.
+
+## Permission table
+
+| Permission | Level | Why it's needed |
+| --- | --- | --- |
+| **Contents** | `read` | Read the pull request diff and the `.mergewatch.yml` configuration file from the repository root. MergeWatch never writes to repository contents. |
+| **Pull requests** | `write` | Post review comments and findings as inline PR comments. This is the primary output channel for every review. |
+| **Checks** | `write` | Create check runs on the pull request with a findings summary, risk rating, and pass/fail status. |
+| **Members** | `read` | Verify that the user accessing organization-level settings in the dashboard is an org admin. No member data is stored. |
+
+<Info>
+  All permissions are set at install time via the GitHub App manifest. You can verify them at any time in **GitHub Settings > Applications > MergeWatch > Permissions**.
+</Info>
+
+## What MergeWatch does NOT request
+
+Equally important is what the app *cannot* do. These permissions are intentionally excluded.
+
+<CardGroup cols={3}>
+  <Card title="No repository: write" icon="lock">
+    MergeWatch cannot push commits, merge pull requests, or modify any file in your repository. It is read-only with respect to code.
+  </Card>
+  <Card title="No secrets: read" icon="key">
+    MergeWatch cannot access repository or organization secrets. It has zero visibility into your CI/CD credentials, tokens, or environment variables.
+  </Card>
+  <Card title="No actions: write" icon="ban">
+    MergeWatch cannot trigger, cancel, or modify GitHub Actions workflows. It operates entirely outside your CI/CD pipeline.
+  </Card>
+</CardGroup>
+
+## Webhook events
+
+MergeWatch subscribes to four webhook events. Each event triggers a specific, scoped action.
+
+| Event | Why it's subscribed |
+| --- | --- |
+| `pull_request` | Triggers the review pipeline when a PR is opened, synchronized (new commits pushed), or reopened. |
+| `issue_comment` | Listens for commands in PR comments (e.g., `@mergewatch review` to re-trigger a review). |
+| `installation` | Tracks when the app is installed or uninstalled so MergeWatch can provision or clean up repository records in DynamoDB. |
+| `installation_repositories` | Tracks when repositories are added to or removed from an existing installation. |
+
+<Tip>
+  You can inspect every webhook delivery — including payload and response — in your GitHub App's **Advanced** tab under **Recent Deliveries**.
+</Tip>
+
+## Security model
+
+MergeWatch is designed so that sensitive credentials are never embedded in code, environment variables, or Lambda configuration.
+
+### Zero API keys in the runtime
+
+GitHub credentials (App ID, private key, webhook secret) are stored in **AWS SSM Parameter Store**, encrypted at rest with AWS KMS. The Lambda function reads them at invocation time via the SSM API — they are never baked into the deployment artifact.
+
+Amazon Bedrock authentication uses the **Lambda execution role** (IAM instance profile). There are no Bedrock API keys to manage, rotate, or leak.
+
+### Webhook signature validation
+
+Every incoming webhook is validated using **HMAC-SHA256** before any processing occurs. Requests with missing or invalid signatures are rejected immediately. This prevents spoofed payloads from triggering the review pipeline.
+
+### IAM permissions are tightly scoped
+
+The Lambda execution role follows least-privilege IAM policy design.
+
+| IAM Action | Scope |
+| --- | --- |
+| `bedrock:InvokeModel` | Scoped to specific foundation model ARNs only. |
+| `dynamodb:GetItem`, `PutItem`, `Query`, `UpdateItem` | Limited to the MergeWatch-specific tables created during deployment. |
+| `ssm:GetParameter` | Limited to `/mergewatch/{stage}/*` parameters only. |
+
+<Note>
+  The IAM policy is defined in the SAM template and deployed via CloudFormation. You can audit the exact permissions in the `template.yaml` file of the MergeWatch repository.
+</Note>
+
+## Frequently asked questions
+
+<Accordion title="Can MergeWatch modify my code?">
+  No. MergeWatch has `contents: read` only. It cannot push commits, create branches, or modify any file. The only write operations are posting review comments (`pull_requests: write`) and creating check runs (`checks: write`).
+</Accordion>
+
+<Accordion title="Does MergeWatch store my source code?">
+  No. Diffs are read from the GitHub API, processed in memory during the Lambda invocation, and discarded. No source code is written to DynamoDB, S3, or any other persistent store.
+</Accordion>
+
+<Accordion title="Can I restrict which repositories MergeWatch accesses?">
+  Yes. During installation, select **Only select repositories** instead of **All repositories**. You can change this at any time in GitHub Settings > Applications.
+</Accordion>
+
+<Accordion title="How do I audit what MergeWatch is doing?">
+  Three places to look: **GitHub webhook delivery logs** show every event sent to the app. **CloudWatch Logs** capture the full Lambda execution trace. **Bedrock invocation logs** (if enabled) show every model call and its input/output.
+</Accordion>

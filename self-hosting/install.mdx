@@ -1,0 +1,242 @@
+---
+title: "Install"
+description: "Deploy MergeWatch to your AWS account with a single command."
+---
+
+The `npx mergewatch@latest init` wizard automates the entire setup: creating a GitHub App, storing credentials, and deploying infrastructure via AWS SAM.
+
+<Note>
+Most users arrive here from [Quickstart](/overview/quickstart). Make sure you have completed the [Prerequisites](/self-hosting/prerequisites) before continuing.
+</Note>
+
+## What the wizard creates
+
+The wizard deploys the following infrastructure to your AWS account:
+
+| Resource | Details |
+|---|---|
+| **API Gateway** | HTTPS endpoint that receives GitHub webhooks |
+| **WebhookHandler Lambda** | Node.js 20.x, ARM64, 256 MB memory, 30 s timeout |
+| **ReviewAgent Lambda** | Node.js 20.x, ARM64, 1024 MB memory, 300 s timeout |
+| **SQS FIFO Queue** | Ensures sequential review processing per pull request |
+| **DynamoDB Tables** | `mergewatch-installations` and `mergewatch-reviews` |
+| **SSM Parameters** | Encrypted credentials stored under `/mergewatch/{stage}/` |
+
+## Run the install wizard
+
+<Steps>
+
+<Step title="Start the wizard">
+
+```bash
+npx mergewatch@latest init
+```
+
+You are prompted for an AWS region and a stage name (e.g. `prod`, `staging`). The stage name scopes all resources so you can run multiple environments side by side.
+
+```text
+$ npx mergewatch@latest init
+
+  __  __                   __        __    _       _
+ |  \/  | ___ _ __ __ _  __\ \      / /_ _| |_ ___| |__
+ | |\/| |/ _ \ '__/ _` |/ _ \ \ /\ / / _` | __/ __| '_ \
+ | |  | |  __/ | | (_| |  __/\ V  V / (_| | || (__| | | |
+ |_|  |_|\___|_|  \__, |\___| \_/\_/ \__,_|\__\___|_| |_|
+                   |___/
+
+? AWS Region: us-east-1
+? Stage name: prod
+```
+
+</Step>
+
+<Step title="Create the GitHub App">
+
+The wizard opens your browser to GitHub's app manifest flow. This creates a dedicated GitHub App under your account or organization.
+
+```text
+→ Opening browser to create GitHub App...
+→ Waiting for GitHub callback...
+✓ GitHub App "MergeWatch (prod)" created (App ID: 123456)
+```
+
+<Tip>
+The manifest flow pre-fills all required permissions and webhook event subscriptions. You do not need to configure anything manually. See [Permissions](/github-app/permissions) for the full list.
+</Tip>
+
+**What happens during the manifest flow:**
+
+1. Your browser opens the GitHub App registration page with a pre-filled manifest
+2. You review the app name, permissions, and webhook events
+3. You click **Create GitHub App**
+4. GitHub redirects back to the CLI with the app credentials
+
+<Warning>
+Do not close the terminal while the browser is open. The CLI is waiting for the callback from GitHub to continue.
+</Warning>
+
+</Step>
+
+<Step title="Credentials are stored in SSM">
+
+The wizard automatically stores three secrets in AWS SSM Parameter Store, encrypted with your account's default KMS key:
+
+```text
+✓ Stored /mergewatch/prod/github-app-id
+✓ Stored /mergewatch/prod/github-private-key
+✓ Stored /mergewatch/prod/github-webhook-secret
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `/mergewatch/{stage}/github-app-id` | `String` | The numeric GitHub App ID |
+| `/mergewatch/{stage}/github-private-key` | `SecureString` | RSA private key for authenticating as the App |
+| `/mergewatch/{stage}/github-webhook-secret` | `SecureString` | HMAC secret for validating webhook payloads |
+
+<Note>
+All `SecureString` parameters are encrypted at rest using AWS KMS. The Lambda functions decrypt them at runtime via IAM policies scoped to these specific parameter paths.
+</Note>
+
+You can verify the stored parameters at any time:
+
+```bash
+aws ssm get-parameters-by-path \
+  --path "/mergewatch/prod/" \
+  --query "Parameters[].Name" \
+  --output table
+```
+
+</Step>
+
+<Step title="SAM build and deploy">
+
+The wizard runs `sam build` and `sam deploy` automatically. This takes 2-3 minutes on a typical connection.
+
+```text
+→ Building SAM application...
+✓ Build complete
+
+→ Deploying stack "mergewatch-prod"...
+
+CloudFormation events:
+  CREATE_COMPLETE    AWS::DynamoDB::Table       InstallationsTable
+  CREATE_COMPLETE    AWS::DynamoDB::Table       ReviewsTable
+  CREATE_COMPLETE    AWS::SQS::Queue            ReviewQueue.fifo
+  CREATE_COMPLETE    AWS::Lambda::Function      WebhookHandlerFunction
+  CREATE_COMPLETE    AWS::Lambda::Function      ReviewAgentFunction
+  CREATE_COMPLETE    AWS::ApiGateway::RestApi   WebhookApi
+
+✓ Stack "mergewatch-prod" deployed successfully
+```
+
+</Step>
+
+<Step title="Webhook URL is printed">
+
+When the deploy finishes, the wizard prints the webhook URL and the GitHub App installation link.
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ MergeWatch deployed successfully!                         │
+│                                                              │
+│  Webhook URL:                                                │
+│  https://abc123.execute-api.us-east-1.amazonaws.com/prod     │
+│                                                              │
+│  Install your GitHub App:                                    │
+│  https://github.com/apps/mergewatch-prod/installations/new   │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+The webhook URL has already been configured on the GitHub App. No manual wiring is needed.
+
+</Step>
+
+</Steps>
+
+## Verify the deployment
+
+Run the built-in health check to confirm everything is working:
+
+```bash
+npx mergewatch@latest health
+```
+
+A healthy deployment produces output like this:
+
+```text
+$ npx mergewatch@latest health
+
+Checking MergeWatch (prod) in us-east-1...
+
+  ✓ SSM parameters exist
+  ✓ WebhookHandler Lambda is active
+  ✓ ReviewAgent Lambda is active
+  ✓ SQS queue is reachable
+  ✓ DynamoDB tables exist
+  ✓ API Gateway endpoint responds (200 OK)
+  ✓ GitHub App credentials are valid
+
+All checks passed.
+```
+
+<Warning>
+If any check fails, see [Troubleshooting](/reference/troubleshooting) for common issues and fixes.
+</Warning>
+
+## Install the GitHub App on your repositories
+
+After deploying, install the GitHub App so MergeWatch can receive webhook events from your repositories.
+
+1. Open the installation URL printed by the wizard (or find your app at **GitHub Settings > Developer settings > GitHub Apps**)
+2. Click **Install App**
+3. Choose **All repositories** or select specific ones
+4. Click **Install**
+
+<Tip>
+Start with a single test repository. You can add more repos at any time from **GitHub Settings > Applications > MergeWatch > Configure**.
+</Tip>
+
+For detailed guidance, see [Organization install](/github-app/org-install) or [Personal install](/github-app/personal-install).
+
+## Your first pull request
+
+Open a pull request against any installed repository. MergeWatch picks it up automatically.
+
+**What to expect:**
+
+- The `WebhookHandler` Lambda receives the `pull_request.opened` event and enqueues it to the SQS FIFO queue
+- The `ReviewAgent` Lambda picks up the message, fetches the diff from GitHub, and sends it to Amazon Bedrock
+- A review comment appears on the pull request within **1-3 minutes**
+
+The review includes:
+- A summary of the changes
+- File-by-file findings posted as inline review comments
+- A risk rating (low, medium, high)
+
+<Note>
+The first invocation of each Lambda may experience a cold start, adding 5-10 seconds. Subsequent reviews are faster.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Configure review behavior" icon="sliders" href="/configuration/review-behavior">
+  Tune sensitivity, ignored paths, and review focus areas.
+</Card>
+
+<Card title="Manual install" icon="terminal" href="/self-hosting/manual-install">
+  Step-by-step instructions if you prefer to run each step yourself.
+</Card>
+
+<Card title="Bring Your Own Cloud" icon="key" href="/self-hosting/byoc">
+  Use your own AWS account for Bedrock model access and cost control.
+</Card>
+
+<Card title="CLI reference" icon="book" href="/reference/cli">
+  Full list of CLI commands including health, status, and logs.
+</Card>
+
+</CardGroup>

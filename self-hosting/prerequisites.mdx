@@ -1,0 +1,89 @@
+---
+title: "Prerequisites"
+description: "Everything you need before deploying MergeWatch to your AWS account."
+---
+
+Complete every item below before running the installer. The [preflight script](#check-everything-at-once) at the bottom can verify them all in one shot.
+
+## Required tools
+
+Install these CLI tools on the machine you will deploy from.
+
+| Tool | Minimum version | Install |
+| --- | --- | --- |
+| **Node.js** | 20.0.0 | [nodejs.org/en/download](https://nodejs.org/en/download) |
+| **AWS CLI** | 2.0.0 | [docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) |
+| **AWS SAM CLI** | 1.100.0 | [docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) |
+
+<Tip>
+  Run `node -v && aws --version && sam --version` to quickly confirm all three are installed.
+</Tip>
+
+## AWS account requirements
+
+<Check>
+  **Amazon Bedrock enabled** in at least one supported region.
+  See [Bedrock Regions](/deployment/bedrock-regions) for the full list.
+</Check>
+
+<Check>
+  **Model access granted** for **Claude Sonnet** (`anthropic.claude-sonnet-4-20250514`).
+  Open the [Bedrock Model Access console](https://console.aws.amazon.com/bedrock/home#/modelaccess) and request access if the status is not *Access granted*.
+</Check>
+
+<Check>
+  **IAM user or role with deploy permissions.**
+  The deploying principal needs at minimum:
+  - `cloudformation:*`
+  - `lambda:*`
+  - `apigateway:*`
+  - `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:PassRole`
+  - `s3:CreateBucket`, `s3:PutObject`
+  - `bedrock:InvokeModel`
+
+  Or attach the AWS-managed **AdministratorAccess** policy for a zero-friction first deploy.
+</Check>
+
+<Warning>
+  Never use root-account credentials. Create a dedicated IAM user or assume a role instead.
+</Warning>
+
+## GitHub requirements
+
+Requirements depend on the install type.
+
+### Organization install
+
+<Check>
+  You are an **Owner** or **Admin** of the GitHub organization where you want to install MergeWatch.
+</Check>
+
+### Personal install
+
+<Check>
+  You are signed in to the **personal GitHub account** where you want to install MergeWatch. No special role is needed.
+</Check>
+
+<Info>
+  Not sure which install type to pick? Organization installs cover every repo in the org. Personal installs cover repos owned by your user account. You can always add the other later.
+</Info>
+
+## Check everything at once
+
+Run the built-in preflight check instead of verifying each prerequisite manually:
+
+```bash
+npx mergewatch@latest check
+```
+
+The command validates:
+
+- Node.js, AWS CLI, and SAM CLI versions
+- AWS credentials and Bedrock model access
+- GitHub authentication and permissions
+
+Each check reports **pass** or **fail**. Failed checks include a direct link to the relevant fix instructions above.
+
+<Tip>
+  Run `npx mergewatch@latest check` one more time right before you start the [install](/self-hosting/install) to make sure nothing has changed.
+</Tip>

@@ -1,0 +1,66 @@
+---
+title: FAQ
+description: Frequently asked questions about MergeWatch.
+---
+
+<AccordionGroup>
+  <Accordion title="How is this different from CodeRabbit?">
+    MergeWatch runs in **your** AWS account. Your code never leaves your infrastructure. There is no per-seat pricing — you pay your own Bedrock bill. The project is AGPL v3 open source, and reviews run through a multi-agent parallel pipeline rather than a single-pass model.
+  </Accordion>
+
+  <Accordion title="Does MergeWatch store my code?">
+    - **Self-hosted:** No. Everything runs in your AWS account. MergeWatch has zero access to your code.
+    - **SaaS + BYOC:** MergeWatch processes the diff in-memory to call your Bedrock endpoint. Nothing is persisted.
+    - **SaaS + MergeWatch Bedrock:** Same as BYOC, but MergeWatch pays the Bedrock bill. The diff is processed in-memory and not stored.
+  </Accordion>
+
+  <Accordion title='What does "your AWS account" actually mean?'>
+    You deploy MergeWatch's Lambda stack into your own AWS account using SAM. All Bedrock calls happen from your account. You see the costs in your AWS bill.
+  </Accordion>
+
+  <Accordion title="Do I need to host model weights or GPUs?">
+    No. Amazon Bedrock is a managed API service — AWS hosts the models. You authorize and pay for inference calls via IAM.
+  </Accordion>
+
+  <Accordion title="What happens if Bedrock is unavailable?">
+    The review fails gracefully. A "Review failed" comment is posted on the PR, and the review is marked as "Failed" in the dashboard. You can retrigger it with `@mergewatch review`.
+  </Accordion>
+
+  <Accordion title="Can I use models other than Claude?">
+    Yes. Bedrock supports Llama 3.1 70B, Mistral Large, and others. Set the model in `.mergewatch.yml` or in the dashboard settings.
+  </Accordion>
+
+  <Accordion title="What's the difference between BYOC and self-hosted?">
+    - **BYOC:** You use the mergewatch.ai SaaS for orchestration but connect your own Bedrock account via an IAM cross-account role.
+    - **Self-hosted:** You deploy the entire stack (Lambdas, DynamoDB, API Gateway) in your AWS account. Nothing touches MergeWatch infrastructure.
+  </Accordion>
+
+  <Accordion title="Why AGPL v3 and not MIT?">
+    AGPL ensures improvements to the core stay open source. Companies can use it freely for internal purposes. A commercial license is available for those who need it.
+  </Accordion>
+
+  <Accordion title="How do I get a commercial license?">
+    Contact [sales@mergewatch.ai](mailto:sales@mergewatch.ai).
+  </Accordion>
+
+  <Accordion title="What counts as a PR for billing purposes?">
+    - **Self-hosted:** No billing from MergeWatch. You pay AWS costs only.
+    - **SaaS:** Each PR that triggers a review counts. Skipped PRs do not count.
+  </Accordion>
+
+  <Accordion title="What happens when I hit my PR limit?">
+    Reviews stop until the next billing cycle. Existing reviews remain accessible.
+  </Accordion>
+
+  <Accordion title="Can I use MergeWatch on private repos?">
+    Yes. The GitHub App requests `contents: read` permission to access diffs.
+  </Accordion>
+
+  <Accordion title="Does it work with GitHub Enterprise?">
+    GitHub Enterprise Cloud: yes. GitHub Enterprise Server: not yet (planned).
+  </Accordion>
+
+  <Accordion title="How do I add MergeWatch to multiple orgs?">
+    Install the GitHub App on each org separately. Each installation appears in the dashboard.
+  </Accordion>
+</AccordionGroup>

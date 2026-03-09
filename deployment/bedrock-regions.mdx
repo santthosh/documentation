@@ -1,0 +1,224 @@
+---
+title: AWS Regions & Bedrock
+description: Supported AWS regions, cross-region inference profiles, data residency, and model selection for MergeWatch.
+---
+
+MergeWatch calls Amazon Bedrock to run foundation models. This page covers which regions are supported, how cross-region inference works, what data residency guarantees each region strategy provides, and how to configure your preferred region in `.mergewatch.yml`.
+
+<Warning>
+MergeWatch does **not** host any foundation models. AWS hosts the models in its Bedrock service. Your AWS account (or the MergeWatch account, in the fully-managed SaaS plan) authorizes and pays for every inference call via IAM. MergeWatch orchestrates the request — it never serves model weights.
+</Warning>
+
+---
+
+## Supported regions
+
+MergeWatch supports any AWS region where Amazon Bedrock is available and the desired model has been enabled. The most common regions are:
+
+| Region code | Location | Notes |
+|---|---|---|
+| `us-east-1` | N. Virginia | Broadest model availability, lowest latency for US East |
+| `us-west-2` | Oregon | Full model catalog, good fallback for US East |
+| `eu-west-1` | Ireland | EU data residency for GDPR-scoped workloads |
+| `eu-west-3` | Paris | Alternative EU region |
+| `ap-northeast-1` | Tokyo | Asia-Pacific data residency |
+| `ap-southeast-1` | Singapore | Asia-Pacific alternative |
+
+<Tip>
+Not every model is available in every region. Check the [AWS Bedrock model availability matrix](https://docs.aws.amazon.com/bedrock/latest/userguide/models-regions.html) before selecting a region.
+</Tip>
+
+---
+
+## Supported models
+
+| Model | Bedrock model ID | Best for |
+|---|---|---|
+| Claude Opus 4.6 | `anthropic.claude-opus-4-6` | Deep security and logic analysis |
+| Claude Sonnet 4.6 | `anthropic.claude-sonnet-4-6` | Balanced cost/quality (recommended) |
+| Claude Haiku 4.5 | `anthropic.claude-haiku-4-5-20251001` | Fast style checks, summaries |
+| Llama 3.1 70B | `meta.llama3-1-70b-instruct-v1:0` | Open-weight alternative |
+| Mistral Large | `mistral.mistral-large-2407-v1:0` | EU data residency preference |
+
+<Info>
+Claude Sonnet 4.6 is the default model. It provides the best balance of review quality, latency, and cost for most repositories. Override it in `.mergewatch.yml` only when you have a specific reason.
+</Info>
+
+---
+
+## Cross-region inference profiles
+
+Amazon Bedrock supports **cross-region inference profiles**. When you prefix a model ID with a geographic identifier (e.g., `us.`), Bedrock automatically routes the request to any available region within that geographic boundary.
+
+### How it works
+
+A standard model ID targets a single region:
+
+```
+anthropic.claude-sonnet-4-6
+```
+
+A cross-region model ID adds a geographic prefix:
+
+```
+us.anthropic.claude-sonnet-4-6
+```
+
+When you use the `us.` prefix, Bedrock may route the inference call to `us-east-1`, `us-west-2`, or any other US region where the model is available. You do not control which specific region handles a given request. Bedrock selects the region based on current capacity and availability.
+
+### Geographic boundaries
+
+| Prefix | Boundary | Regions included |
+|---|---|---|
+| `us.` | United States | `us-east-1`, `us-west-2`, and other US Bedrock regions |
+| `eu.` | European Union | `eu-west-1`, `eu-west-3`, and other EU Bedrock regions |
+| `ap.` | Asia-Pacific | `ap-northeast-1`, `ap-southeast-1`, and other AP Bedrock regions |
+
+<Warning>
+A cross-region profile **never** routes traffic outside its geographic boundary. A `us.` prefixed model ID will never send data to an EU or AP region, and vice versa. This is enforced by AWS, not by MergeWatch.
+</Warning>
+
+### When to use cross-region inference
+
+- **Higher availability.** If one US region is at capacity, Bedrock routes to another US region automatically.
+- **No single-region bottleneck.** Useful for organizations with high review volume that may hit per-region request limits.
+- **Trade-off: no pinned region.** You cannot guarantee which specific region handles a request. If your compliance policy requires a specific region (e.g., only `eu-west-1`), do not use a cross-region profile — use the explicit region instead.
+
+---
+
+## Data residency and compliance
+
+Compliance teams should pay close attention to the interaction between region selection, cross-region profiles, and data residency requirements.
+
+### GDPR and EU data residency
+
+If your organization must keep data within the European Union:
+
+1. Set `region` to an EU region (`eu-west-1` or `eu-west-3`) in your `.mergewatch.yml`.
+2. Alternatively, use the `eu.` cross-region prefix to allow routing across EU regions while keeping data within the EU boundary.
+3. Do **not** use a `us.` or `ap.` prefix, and do **not** use a non-EU region code.
+4. Consider using **Mistral Large** (`mistral.mistral-large-2407-v1:0`) if your compliance requirements prefer an EU-developed model.
+
+<Note>
+When using the **SaaS + Customer Bedrock (BYOC)** deployment model, MergeWatch's orchestration layer processes diff data in-memory but does not persist it. The Bedrock inference call itself goes directly to your AWS account in your chosen region. For strict GDPR compliance where no data may transit non-EU infrastructure, use the **Fully Self-Hosted** deployment model. See [Deployment Models](/deployment/deployment-models) for details.
+</Note>
+
+### Other regulatory frameworks
+
+- **APAC data residency** — Use `ap-northeast-1`, `ap-southeast-1`, or the `ap.` cross-region prefix.
+- **US federal / FedRAMP** — Use `us-east-1` or `us-west-2` explicitly. Cross-region profiles are acceptable as long as the `us.` prefix is used, since all routing stays within US regions.
+- **Single-region mandates** — If your policy requires a specific region with no cross-region routing, use the exact region code (e.g., `eu-west-1`) and do not add a geographic prefix to the model ID.
+
+---
+
+## Region selection guidance
+
+### Latency vs. availability
+
+| Strategy | Latency | Availability | When to use |
+|---|---|---|---|
+| Single region (e.g., `us-east-1`) | Lowest and most predictable | Subject to single-region outages | Low volume, strict region requirements |
+| Cross-region profile (e.g., `us.`) | Slightly variable | Higher — automatic failover | High volume, availability is the priority |
+
+<Tip>
+For most teams, using a cross-region profile is the better default. The latency variation is minimal (typically under 100ms), and the availability improvement is significant during regional capacity events.
+</Tip>
+
+---
+
+## Configuration examples
+
+### Single region — US East
+
+```yaml .mergewatch.yml
+version: 1
+model: anthropic.claude-sonnet-4-6
+region: us-east-1
+```
+
+### Cross-region — US boundary
+
+```yaml .mergewatch.yml
+version: 1
+model: us.anthropic.claude-sonnet-4-6
+region: us-east-1   # fallback / default region for non-inference API calls
+```
+
+### Single region — EU (GDPR compliant)
+
+```yaml .mergewatch.yml
+version: 1
+model: mistral.mistral-large-2407-v1:0
+region: eu-west-1
+```
+
+### Cross-region — EU boundary (GDPR compliant)
+
+```yaml .mergewatch.yml
+version: 1
+model: eu.anthropic.claude-sonnet-4-6
+region: eu-west-1
+```
+
+### Single region — Asia-Pacific
+
+```yaml .mergewatch.yml
+version: 1
+model: anthropic.claude-sonnet-4-6
+region: ap-northeast-1
+```
+
+### Cross-region — AP boundary
+
+```yaml .mergewatch.yml
+version: 1
+model: ap.anthropic.claude-sonnet-4-6
+region: ap-northeast-1
+```
+
+### Deep analysis with Opus (US)
+
+```yaml .mergewatch.yml
+version: 1
+model: us.anthropic.claude-opus-4-6
+region: us-east-1
+
+agents:
+  - name: security
+    enabled: true
+  - name: logic
+    enabled: true
+```
+
+---
+
+## Frequently asked questions
+
+<AccordionGroup>
+  <Accordion title="Does MergeWatch host the model?">
+    No. AWS hosts all foundation models in the Bedrock service. MergeWatch sends inference requests to Bedrock on your behalf (using your IAM credentials in BYOC/Self-Hosted, or MergeWatch's credentials in the fully-managed SaaS plan). MergeWatch never downloads, caches, or serves model weights.
+  </Accordion>
+
+  <Accordion title="Can I use a cross-region profile and still be GDPR compliant?">
+    Yes, as long as you use the `eu.` prefix. The EU cross-region profile restricts all routing to EU regions. Data never leaves the EU geographic boundary. This is enforced by AWS at the Bedrock service level.
+  </Accordion>
+
+  <Accordion title="What happens if my chosen region does not support my model?">
+    MergeWatch will return an error on the pull request comment indicating that the model is not available in the configured region. Switch to a supported region or use a cross-region profile to allow Bedrock to route to an available region.
+  </Accordion>
+
+  <Accordion title="Can I use different regions for different agents?">
+    Not currently. The `region` and `model` settings in `.mergewatch.yml` apply to all agents in a repository. If you need different regions for different workloads, use separate repositories or separate MergeWatch installations.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Deployment Models" icon="server" href="/deployment/deployment-models">
+    Compare SaaS, BYOC, and Self-Hosted to understand how region selection interacts with your deployment model.
+  </Card>
+  <Card title=".mergewatch.yml Reference" icon="file-code" href="/configuration/mergewatch-yml">
+    Full reference for all configuration properties including model and region.
+  </Card>
+</CardGroup>

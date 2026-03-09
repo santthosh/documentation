@@ -1,68 +1,100 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
-  "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+  "name": "MergeWatch",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg",
+    "href": "https://mergewatch.ai"
   },
   "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#00ff88",
+    "light": "#00ff88",
+    "dark": "#00cc66"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/mergewatch/mergewatch"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://mergewatch.ai"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Overview",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "overview/introduction",
+              "overview/how-it-works",
+              "overview/quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Self-Hosting",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "self-hosting/prerequisites",
+              "self-hosting/install",
+              "self-hosting/manual-install",
+              "self-hosting/byoc",
+              "self-hosting/upgrading",
+              "self-hosting/uninstalling"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Configuration",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "configuration/mergewatch-yml",
+              "configuration/review-behavior",
+              "configuration/skip-rules",
+              "configuration/custom-instructions"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "GitHub App",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
+              "github-app/permissions",
+              "github-app/org-install",
+              "github-app/personal-install",
+              "github-app/webhook-events"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Deployment",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "deployment/architecture",
+              "deployment/deployment-models",
+              "deployment/bedrock-regions",
+              "deployment/sam-template"
+            ]
+          },
+          {
+            "group": "Dashboard",
+            "pages": [
+              "dashboard/overview",
+              "dashboard/reviews",
+              "dashboard/repositories",
+              "dashboard/settings",
+              "dashboard/profile"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/cli",
+              "reference/env-vars",
+              "reference/changelog",
+              "reference/faq",
+              "reference/troubleshooting"
             ]
           }
         ]
@@ -71,52 +103,21 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "GitHub",
+          "href": "https://github.com/mergewatch/mergewatch",
+          "icon": "github"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "Changelog",
+          "href": "https://docs.mergewatch.ai/reference/changelog",
+          "icon": "list"
         }
       ]
     }
   },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/mergewatch/mergewatch"
     }
   }
 }
