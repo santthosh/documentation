@@ -11,8 +11,8 @@ MergeWatch is an open-source GitHub App that reviews pull requests using a multi
 |---|---|---|---|
 | **Source** | Open source (AGPL v3) | Closed source | Closed source |
 | **Hosting** | Self-hosted (SAM) or SaaS | Self-hosted available (Docker, any cloud) | Self-hosted available (Enterprise, 500-seat min, $15K+/mo) |
-| **Pricing** | No per-seat pricing — pay your Bedrock bill | $30/seat/month | $24/seat/month |
-| **Review approach** | Multi-agent parallel pipeline | Full-codebase graph + multi-hop analysis | Single-pass diff review |
+| **Pricing** | No per-seat pricing — pay your Bedrock bill | Base platform fee + usage-based pricing | $24–$30/seat/month (annual vs monthly) |
+| **Review approach** | Multi-agent parallel pipeline | Full-codebase graph + multi-hop analysis | AI review + 40+ linter integrations |
 | **Model control** | You choose Bedrock models per agent | Bring-your-own-LLM (self-hosted) | Vendor-controlled (SaaS); configurable on self-hosted |
 | **Minimum commitment** | None | None stated | 500 seats for self-hosting |
 
@@ -80,7 +80,7 @@ Configuration lives in a `.mergewatch.yml` file at the root of each repository. 
 
   **Where your code goes.** CodeRabbit's SaaS sends your code to their servers. Enterprise self-hosting exists but requires a 500-seat minimum at $15K+/month. MergeWatch self-hosts via a single SAM deploy with no seat minimum — code never leaves your AWS account.
 
-  **How you pay.** CodeRabbit charges $24/seat/month. MergeWatch has no per-seat fee. You pay your own Bedrock bill, which scales with usage, not team size.
+  **How you pay.** CodeRabbit charges $24–$30/seat/month depending on billing term. MergeWatch has no per-seat fee. You pay your own Bedrock bill, which scales with usage, not team size.
 
   **Source availability.** CodeRabbit is closed source. MergeWatch is AGPL v3 — you can read every line of the review logic, audit exactly what runs on your code, and contribute improvements.
 
