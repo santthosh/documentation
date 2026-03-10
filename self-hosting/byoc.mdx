@@ -19,13 +19,21 @@ The data flow with BYOC enabled:
 4. The diff and agent prompts are sent to **Amazon Bedrock in your account** for inference
 5. The model response is returned to MergeWatch, which posts a review comment on GitHub
 
-```text
-GitHub ──webhook──▶ MergeWatch Lambda ──sts:AssumeRole──▶ Your AWS Account
-                     (processes diff         │                  │
-                      in memory)             │            Bedrock (inference)
-                                             │                  │
-                     posts review  ◀─────────┘◀─────────────────┘
-                     comment on PR
+```mermaid
+sequenceDiagram
+    participant GH as GitHub
+    participant MW as MergeWatch Lambda
+    participant STS as sts:AssumeRole
+    participant BR as Bedrock (Your Account)
+
+    GH->>MW: Webhook (pull_request)
+    MW->>GH: Fetch PR diff
+    MW->>MW: Process diff in memory
+    MW->>STS: Assume cross-account role
+    STS-->>MW: Temporary credentials
+    MW->>BR: Invoke model (your account, your bill)
+    BR-->>MW: Model response
+    MW->>GH: Post review comments
 ```
 
 <Warning>

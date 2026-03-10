@@ -160,26 +160,22 @@ In **App settings > Domain management**, add your custom domain (e.g. `app.merge
 
 The dashboard uses **NextAuth.js with the GitHub provider**. The same GitHub App that handles webhooks also authenticates users — there is no separate OAuth app.
 
-```
-User clicks "Sign in with GitHub"
-         │
-         v
-NextAuth redirects to GitHub OAuth
-(using your GitHub App's client_id)
-         │
-         v
-User authorizes → GitHub redirects back with code
-         │
-         v
-NextAuth exchanges code for access token
-         │
-         v
-Dashboard calls GitHub API:
-  GET /user/installations
-  → Returns all GitHub App installations the user has access to
-         │
-         v
-Dashboard scopes all data to installation_id
+```mermaid
+sequenceDiagram
+    actor User
+    participant Dashboard
+    participant GitHub as GitHub OAuth
+    participant API as GitHub API
+
+    User->>Dashboard: Click "Sign in with GitHub"
+    Dashboard->>GitHub: Redirect (client_id)
+    GitHub->>User: Authorize prompt
+    User->>GitHub: Approve
+    GitHub->>Dashboard: Redirect with auth code
+    Dashboard->>GitHub: Exchange code for access token
+    Dashboard->>API: GET /user/installations
+    API-->>Dashboard: Installation IDs
+    Dashboard->>Dashboard: Scope all data to installation_id
 ```
 
 ### GitHub scopes requested
@@ -214,17 +210,19 @@ Session expiry defaults to 30 days.
 
 The dashboard calls your Lambda backend via API Gateway. All API calls are authenticated using the user's GitHub session — the backend validates the GitHub token on each request.
 
-```
-Dashboard (Amplify) → API Gateway → Lambda
+```mermaid
+sequenceDiagram
+    participant Dash as Dashboard (Amplify)
+    participant AG as API Gateway
+    participant Lambda
+    participant GH as GitHub API
 
-Request:
-  GET /api/reviews?installation_id=123
-  Authorization: Bearer {github_oauth_token}
-
-Lambda validates:
-  GET https://api.github.com/user
-  → Confirms token is valid and belongs to a user
-    with access to installation_id 123
+    Dash->>AG: GET /api/reviews?installation_id=123<br/>Authorization: Bearer {token}
+    AG->>Lambda: Forward request
+    Lambda->>GH: GET /user (validate token)
+    GH-->>Lambda: User profile + installations
+    Lambda->>Lambda: Confirm user has access to installation 123
+    Lambda-->>Dash: Review data (JSON)
 ```
 
 Set `NEXT_PUBLIC_API_URL` to your API Gateway URL from the SAM stack output. The dashboard appends paths like `/reviews`, `/repositories`, `/settings` to this base URL.

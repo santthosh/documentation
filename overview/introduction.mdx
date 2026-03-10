@@ -39,17 +39,21 @@ MergeWatch is an open-source GitHub App that reviews pull requests using a multi
 Each agent is a separate Bedrock invocation running in parallel via `Promise.all()`. The orchestrator runs after all agents complete.
 </Note>
 
-```
-PR opened → GitHub webhook → WebhookHandler → ReviewAgent (async)
-  ├── Security agent
-  ├── Bug detection agent
-  ├── Style agent
-  ├── Summary agent
-  └── Diagram agent
-       ↓
-  Orchestrator (dedup + rank)
-       ↓
-  GitHub review comments posted
+```mermaid
+flowchart LR
+    PR["PR opened"] --> WH["WebhookHandler"]
+    WH -->|async invoke| RA["ReviewAgent"]
+    RA --> SEC["Security"]
+    RA --> BUG["Bug detection"]
+    RA --> STY["Style"]
+    RA --> SUM["Summary"]
+    RA --> DIA["Diagram"]
+    SEC --> ORC["Orchestrator"]
+    BUG --> ORC
+    STY --> ORC
+    SUM --> ORC
+    DIA --> ORC
+    ORC --> GH["GitHub comments"]
 ```
 
 ## Deployment models
