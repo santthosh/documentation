@@ -1,0 +1,71 @@
+---
+title: "Anthropic"
+description: "Use Anthropic's Claude models directly — the default and recommended LLM provider."
+---
+
+Anthropic is the **default and recommended** LLM provider for MergeWatch. It offers the simplest setup — just add your API key and you are ready to go. Works on every platform (Docker, AWS, GCP, bare metal).
+
+## Configuration
+
+Set these environment variables in your `.env` file or container environment:
+
+| Variable | Required | Value |
+| --- | --- | --- |
+| `LLM_PROVIDER` | Yes | `anthropic` |
+| `ANTHROPIC_API_KEY` | Yes | Your Anthropic API key |
+| `LLM_MODEL` | No | Override the default model |
+
+## Default model
+
+MergeWatch uses **`claude-3-5-haiku-20241022`** by default. This model provides an excellent balance of speed, quality, and cost for code review tasks.
+
+## Model override
+
+To use a higher-capability model, set `LLM_MODEL` in your environment:
+
+```bash
+LLM_MODEL=claude-3-5-sonnet-20241022
+```
+
+Sonnet produces more detailed reviews and catches subtler issues, at a higher per-token cost.
+
+## Example `.env` file
+
+```bash
+# LLM Provider
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-api03-...
+
+# Optional: override the default model
+# LLM_MODEL=claude-3-5-sonnet-20241022
+```
+
+## Pricing
+
+You pay Anthropic directly for API usage. MergeWatch does not add any markup or proxy fees. See the [Anthropic pricing page](https://www.anthropic.com/pricing#702702) for current per-token rates.
+
+<Tip>
+Claude 3.5 Haiku is one of the most cost-effective models for code review. Most repositories see costs under $5/month with typical PR volumes.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Configure review behavior" icon="sliders" href="/configuration/review-behavior">
+  Tune sensitivity, ignored paths, and review focus areas.
+</Card>
+
+<Card title="LiteLLM Proxy" icon="shuffle" href="/self-hosting/llm-providers/litellm">
+  Use OpenAI, Azure, Gemini, or 100+ other providers via LiteLLM.
+</Card>
+
+<Card title="Environment variables" icon="gear" href="/reference/env-vars">
+  Full list of supported environment variables.
+</Card>
+
+<Card title="Platform guides" icon="server" href="/self-hosting/platforms/google-cloud-run">
+  Deploy MergeWatch on your platform of choice.
+</Card>
+
+</CardGroup>

@@ -5,51 +5,67 @@ description: Frequently asked questions about MergeWatch.
 
 <AccordionGroup>
   <Accordion title="How is this different from CodeRabbit?">
-    MergeWatch runs in **your** AWS account. Your code never leaves your infrastructure. There is no per-seat pricing — you pay your own Bedrock bill. The project is AGPL v3 open source, and reviews run through a multi-agent parallel pipeline rather than a single-pass model.
+    MergeWatch can run entirely self-hosted with Docker Compose — your code never leaves your infrastructure. There is no per-seat pricing. The project is AGPL v3 open source, and reviews run through a multi-agent parallel pipeline rather than a single-pass model. You can choose your own LLM provider (Anthropic, Bedrock, LiteLLM, or Ollama).
   </Accordion>
 
   <Accordion title="Does MergeWatch store my code?">
-    - **Self-hosted:** No. Everything runs in your AWS account. MergeWatch has zero access to your code.
-    - **SaaS + BYOC:** MergeWatch processes the diff in-memory to call your Bedrock endpoint. Nothing is persisted.
-    - **SaaS + MergeWatch Bedrock:** Same as BYOC, but MergeWatch pays the Bedrock bill. The diff is processed in-memory and not stored.
+    - **Self-hosted:** No. Everything runs on your own machine or server. MergeWatch has zero access to your code.
+    - **SaaS:** MergeWatch processes the diff in-memory to call the LLM. Nothing is persisted beyond the review metadata stored in DynamoDB.
   </Accordion>
 
-  <Accordion title='What does "your AWS account" actually mean?'>
-    You deploy MergeWatch's Lambda stack into your own AWS account using SAM. All Bedrock calls happen from your account. You see the costs in your AWS bill.
+  <Accordion title="What are the two deployment modes?">
+    MergeWatch offers two ways to run:
+
+    - **Self-hosted:** Clone the repo, configure a `.env` file, and run `docker compose up`. You control the entire stack — the server, database, dashboard, and LLM provider.
+    - **SaaS:** Use the hosted version at mergewatch.ai. No infrastructure to manage. First 20 PR reviews per month are free, then $0.35 per PR.
+  </Accordion>
+
+  <Accordion title="What happened to BYOC (Bring Your Own Cloud)?">
+    BYOC has been removed. MergeWatch now has two modes: **self-hosted** (Docker Compose on any machine) and **SaaS** (hosted at mergewatch.ai). If you previously used BYOC, the self-hosted option gives you equivalent control over your infrastructure.
+  </Accordion>
+
+  <Accordion title="Do I need an AWS account to self-host?">
+    No. Self-hosted MergeWatch runs entirely with Docker and does not require any AWS services. The only scenario where you need an AWS account is if you set `LLM_PROVIDER=bedrock` to use Amazon Bedrock as your LLM backend. All other providers (Anthropic, LiteLLM, Ollama) work without AWS.
+  </Accordion>
+
+  <Accordion title="Which LLM provider should I use?">
+    **Anthropic** is the recommended default. It offers the best balance of review quality and ease of setup — you only need an API key. Here is a quick comparison:
+
+    | Provider | Best for |
+    | --- | --- |
+    | `anthropic` | Recommended default. High-quality reviews, simple setup. |
+    | `bedrock` | Teams already using AWS who want to keep traffic within their AWS account. |
+    | `litellm` | Organizations running a LiteLLM proxy for centralized model access and cost tracking. |
+    | `ollama` | Air-gapped or fully offline environments. |
+  </Accordion>
+
+  <Accordion title="Can I run MergeWatch without internet access?">
+    Yes. Set `LLM_PROVIDER=ollama` and run an Ollama instance as a sidecar container (or on a separate host on your network). The MergeWatch server, Postgres database, and Ollama can all run on the same machine with no outbound internet required. The only external connection needed is the GitHub webhook — which requires inbound HTTPS from GitHub's IP ranges.
+  </Accordion>
+
+  <Accordion title="Is SaaS really free?">
+    The first 20 PR reviews per month are free with no credit card required. After that, each review costs a flat $0.35 per PR. You can set a monthly spend cap in the dashboard.
   </Accordion>
 
   <Accordion title="Do I need to host model weights or GPUs?">
-    No. Amazon Bedrock is a managed API service — AWS hosts the models. You authorize and pay for inference calls via IAM.
+    Not unless you use `LLM_PROVIDER=ollama`. Anthropic and Bedrock are managed API services — the provider hosts the models. With Ollama, you run the model locally, which does require sufficient hardware (CPU or GPU depending on the model size).
   </Accordion>
 
-  <Accordion title="What happens if Bedrock is unavailable?">
-    The review fails gracefully. A "Review failed" comment is posted on the PR, and the review is marked as "Failed" in the dashboard. You can retrigger it with `@mergewatch review`.
+  <Accordion title="What happens if the LLM provider is unavailable?">
+    The review fails gracefully. A "Review failed" comment is posted on the PR, and the review is marked as failed in the dashboard. You can retrigger it with `@mergewatch review`.
   </Accordion>
 
   <Accordion title="Can I use models other than Claude?">
-    Yes. Bedrock supports Llama 3.1 70B, Mistral Large, and others. Set the model in `.mergewatch.yml` or in the dashboard settings.
-  </Accordion>
-
-  <Accordion title="What's the difference between BYOC and self-hosted?">
-    - **BYOC:** You use the mergewatch.ai SaaS for orchestration but connect your own Bedrock account via an IAM cross-account role.
-    - **Self-hosted:** You deploy the entire stack (Lambdas, DynamoDB, API Gateway) in your AWS account. Nothing touches MergeWatch infrastructure.
-  </Accordion>
-
-  <Accordion title="Why AGPL v3 and not MIT?">
-    AGPL ensures improvements to the core stay open source. Companies can use it freely for internal purposes. A commercial license is available for those who need it.
-  </Accordion>
-
-  <Accordion title="How do I get a commercial license?">
-    Contact [sales@mergewatch.ai](mailto:sales@mergewatch.ai).
+    Yes. With `LLM_PROVIDER=bedrock`, you can use any Bedrock-supported model. With `LLM_PROVIDER=litellm`, you can use any model your LiteLLM proxy supports (OpenAI, Gemini, Mistral, etc.). With `LLM_PROVIDER=ollama`, you can use any model Ollama supports. Set the `LLM_MODEL` environment variable to override the default.
   </Accordion>
 
   <Accordion title="What counts as a PR for billing purposes?">
-    - **Self-hosted:** No billing from MergeWatch. You pay AWS costs only.
-    - **SaaS:** Each PR that triggers a review counts. Skipped PRs do not count.
+    - **Self-hosted:** No billing from MergeWatch. You pay only your LLM provider costs.
+    - **SaaS:** Each PR that triggers a review counts. Skipped PRs (drafts, excluded paths) do not count.
   </Accordion>
 
-  <Accordion title="What happens when I hit my PR limit?">
-    There is no PR limit. You pay per review at the sliding rate. If you want a spend cap, set one in the dashboard.
+  <Accordion title="What happens when I hit 20 free PRs?">
+    Reviews continue at $0.35 per PR. There is no hard cutoff. If you want a spend cap, set one in the dashboard to pause reviews once the limit is reached.
   </Accordion>
 
   <Accordion title="Can I use MergeWatch on private repos?">
@@ -62,5 +78,13 @@ description: Frequently asked questions about MergeWatch.
 
   <Accordion title="How do I add MergeWatch to multiple orgs?">
     Install the GitHub App on each org separately. Each installation appears in the dashboard.
+  </Accordion>
+
+  <Accordion title="Why AGPL v3 and not MIT?">
+    AGPL ensures improvements to the core stay open source. Companies can use it freely for internal purposes. A commercial license is available for those who need it.
+  </Accordion>
+
+  <Accordion title="How do I get a commercial license?">
+    Contact [sales@mergewatch.ai](mailto:sales@mergewatch.ai).
   </Accordion>
 </AccordionGroup>

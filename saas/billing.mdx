@@ -1,0 +1,64 @@
+---
+title: "Billing & Pricing"
+description: "MergeWatch SaaS pricing — free tier, per-PR pricing, and spend caps."
+---
+
+MergeWatch SaaS charges per pull request reviewed. There are no per-seat fees — ever. Your entire team uses MergeWatch under a single billing account tied to your GitHub organization or user account.
+
+## Free tier
+
+Every account gets **20 free PR reviews per month**. No credit card is required to start. The free tier resets on the first of each calendar month (UTC).
+
+## Pricing tiers
+
+Pricing is volume-based. The more PRs you review in a billing month, the lower your per-PR cost:
+
+| Monthly volume | Price per PR |
+|---|---|
+| 1 – 20 | **Free** |
+| 21 – 500 | $0.35 |
+| 501 – 2,000 | $0.25 |
+| 2,001+ | $0.18 |
+
+<Tip>
+Tiers are cumulative within a billing month. If you review 600 PRs, the first 20 are free, PRs 21–500 are billed at $0.35 each, and PRs 501–600 are billed at $0.25 each.
+</Tip>
+
+## No per-seat fees
+
+MergeWatch does not charge per user, per seat, or per repository. A single billing account covers everyone in your GitHub organization. Add as many developers and repos as you want — pricing is based solely on the number of PR reviews.
+
+## What counts as a PR
+
+A **billable PR** is any pull request that triggers a MergeWatch review. Specifically:
+
+- Each `pull_request` event (opened, synchronize) that results in a completed review counts as one PR.
+- If a PR is **skipped** because of a skip rule in your `.mergewatch.yml` (e.g., draft PRs, specific file paths, or label-based exclusions), it does **not** count toward your usage.
+- Multiple pushes to the same PR each count as a separate review, since MergeWatch re-analyzes the updated diff each time.
+
+## Spend cap
+
+You can set an optional **hard monthly spend cap** in the MergeWatch dashboard under **Settings > Billing**. When your spend reaches the cap:
+
+- MergeWatch stops reviewing new PRs for the remainder of the billing month.
+- Existing reviews and comments remain on your PRs.
+- You receive an email notification when you reach 80% and 100% of your cap.
+
+<Warning>
+Once the spend cap is hit, no new reviews will be posted until the next billing month or until you raise the cap. Make sure your cap accommodates your expected PR volume.
+</Warning>
+
+## Self-hosted is always free
+
+If you self-host MergeWatch, there is no MergeWatch fee. You pay only your LLM provider (Anthropic API, Amazon Bedrock, Ollama, or any provider supported via LiteLLM). See [Self-Hosting Overview](/self-hosting/overview) for details.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/saas/getting-started">
+    Install the GitHub App and start reviewing PRs in minutes.
+  </Card>
+  <Card title="Data Residency" icon="shield-halved" href="/saas/data-residency">
+    Understand where your data is processed and stored.
+  </Card>
+</CardGroup>

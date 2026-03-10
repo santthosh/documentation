@@ -3,99 +3,56 @@ title: "Upgrading"
 description: "Upgrade MergeWatch to the latest version."
 ---
 
-## CLI upgrade (recommended)
+## Pull and restart
 
-The fastest way to upgrade is with the CLI:
-
-```bash
-npx mergewatch@latest upgrade
-```
-
-This command:
-
-1. Pulls the latest SAM template
-2. Runs `sam deploy` with your existing `samconfig.toml`
-3. Runs a health check to confirm the upgrade succeeded
-
----
-
-## Manual upgrade
-
-If you deployed manually or prefer full control:
+Upgrading MergeWatch is a single command:
 
 ```bash
-cd mergewatch.ai
-git pull origin main
-npm install
-sam build
-sam deploy
+docker compose pull && docker compose up -d
 ```
 
-<Tip>
-Run `npx mergewatch@latest health` after a manual upgrade to verify everything is working.
-</Tip>
+This pulls the latest image (`ghcr.io/santthosh/mergewatch:latest`) and restarts the container. The Postgres sidecar is unaffected.
 
----
+## Database migrations
 
-## What gets updated
-
-| Updated                     | Not modified               |
-| --------------------------- | -------------------------- |
-| Lambda function code        | DynamoDB tables and data   |
-| IAM policies (if changed)   | SSM parameters             |
-| API Gateway configuration   | Existing review history    |
+Database migrations run automatically on container startup. When a new version includes schema changes, they are applied as soon as the container starts. No manual migration steps are needed.
 
 <Note>
-Your DynamoDB tables and SSM parameters are never modified during upgrades. Review history and credentials are preserved.
+Your existing review history and configuration data are preserved during upgrades. Migrations only add or modify schema — they never delete data.
 </Note>
-
----
 
 ## Zero-downtime upgrades
 
-SAM uses CloudFormation rolling updates. During an upgrade:
+Docker Compose restarts containers sequentially. During an upgrade:
 
-- Old Lambda versions continue processing in-flight reviews
-- New reviews are routed to the updated code
-- There is no interruption to webhook delivery
+- The old container processes any in-flight review before shutting down
+- The new container starts and begins accepting webhooks
+- GitHub retries any webhook deliveries that fail during the brief restart window
 
----
+For true zero-downtime upgrades in production, consider running MergeWatch behind a load balancer with multiple replicas, or use a platform with rolling deployments (e.g., Kubernetes, ECS, Cloud Run).
 
 ## Rollback
 
-If something goes wrong, CloudFormation automatically rolls back to the previous stack version.
-
-You can also manually trigger a rollback:
+To roll back to a specific version, pin the image tag:
 
 ```bash
-aws cloudformation rollback-stack --stack-name mergewatch-prod
+docker compose pull ghcr.io/santthosh/mergewatch:v0.1.0
+docker compose up -d
 ```
 
 <Warning>
-Manual rollback reverts Lambda code and infrastructure to the previous deployment. It does not affect data in DynamoDB or SSM.
+Rolling back to a version with an older database schema may cause issues if newer migrations have already run. Test rollbacks in a staging environment first.
 </Warning>
 
----
+## Platform-specific upgrades
 
-## Version pinning
-
-To upgrade to a specific version instead of the latest:
-
-```bash
-npx mergewatch@0.1.0 upgrade
-```
-
-This is useful for testing a specific release before rolling it out broadly.
-
----
-
-## Next steps
+If you deployed MergeWatch to a specific platform, see the corresponding guide for platform-native upgrade instructions:
 
 <CardGroup cols={2}>
+  <Card title="Platform Guides" icon="cloud" href="/self-hosting/platforms/google-cloud-run">
+    Google Cloud Run, AWS ECS, Azure, Fly.io, Railway, and more.
+  </Card>
   <Card title="Changelog" icon="clock-rotate-left" href="/reference/changelog">
     See what changed in each release.
-  </Card>
-  <Card title="CLI Reference" icon="terminal" href="/reference/cli">
-    Full list of CLI commands and flags.
   </Card>
 </CardGroup>

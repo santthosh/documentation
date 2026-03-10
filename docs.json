@@ -43,12 +43,33 @@
           {
             "group": "Self-Hosting",
             "pages": [
+              "self-hosting/overview",
               "self-hosting/prerequisites",
               "self-hosting/install",
               "self-hosting/manual-install",
-              "self-hosting/byoc",
               "self-hosting/upgrading",
               "self-hosting/uninstalling"
+            ]
+          },
+          {
+            "group": "LLM Providers",
+            "pages": [
+              "self-hosting/llm-providers/anthropic",
+              "self-hosting/llm-providers/litellm",
+              "self-hosting/llm-providers/bedrock",
+              "self-hosting/llm-providers/ollama"
+            ]
+          },
+          {
+            "group": "Platform Guides",
+            "pages": [
+              "self-hosting/platforms/google-cloud-run",
+              "self-hosting/platforms/aws-ecs-fargate",
+              "self-hosting/platforms/azure-container-apps",
+              "self-hosting/platforms/fly-io",
+              "self-hosting/platforms/railway-render",
+              "self-hosting/platforms/vps-bare-metal",
+              "self-hosting/platforms/air-gapped"
             ]
           },
           {
@@ -74,7 +95,6 @@
             "pages": [
               "deployment/architecture",
               "deployment/deployment-models",
-              "deployment/bedrock-regions",
               "deployment/sam-template"
             ]
           },
@@ -87,6 +107,14 @@
               "dashboard/repositories",
               "dashboard/settings",
               "dashboard/profile"
+            ]
+          },
+          {
+            "group": "Managed SaaS",
+            "pages": [
+              "saas/getting-started",
+              "saas/billing",
+              "saas/data-residency"
             ]
           },
           {

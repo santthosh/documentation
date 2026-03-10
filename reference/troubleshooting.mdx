@@ -3,41 +3,78 @@ title: "Troubleshooting"
 description: "Common MergeWatch problems with causes and fixes."
 ---
 
+## Docker and container issues
+
+<Accordion title="Container exits immediately">
+  The MergeWatch container will exit on startup if required environment variables are missing or malformed.
+
+  **Fix:** Check the container logs for the specific error:
+
+  ```bash
+  docker compose logs mergewatch
+  ```
+
+  Common causes:
+  - Missing `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, or `DATABASE_URL`
+  - Malformed `GITHUB_PRIVATE_KEY` (must be the full PEM content, including `-----BEGIN RSA PRIVATE KEY-----` headers)
+  - Invalid `DATABASE_URL` format
+
+  Verify your `.env` file contains all required variables listed in the [environment variables reference](/reference/env-vars).
+</Accordion>
+
+<Accordion title="Port conflict on startup">
+  If port 3000 or 3001 is already in use, Docker Compose will fail to bind.
+
+  **Fix:** Either stop the conflicting process or change the port mapping in `docker-compose.yml`:
+
+  ```yaml
+  ports:
+    - "8080:3000"  # Map to a different host port
+  ```
+
+  You can also set the `PORT` environment variable to change the port inside the container.
+</Accordion>
+
+<Accordion title="Database connection refused">
+  The MergeWatch server cannot connect to Postgres. This typically happens when Postgres has not finished starting before MergeWatch tries to connect.
+
+  **Fix:**
+  1. Confirm the Postgres container is running: `docker compose ps`
+  2. Check that `DATABASE_URL` matches your Postgres container's hostname, port, user, and password
+  3. If using the default `docker-compose.yml`, the Postgres service is named `postgres` — the connection string should use `postgres` as the hostname (e.g. `postgresql://mergewatch:password@postgres:5432/mergewatch`)
+  4. Restart the stack: `docker compose down && docker compose up -d`
+</Accordion>
+
+<Accordion title="Cannot pull Docker images">
+  The images `ghcr.io/santthosh/mergewatch:latest` and `ghcr.io/santthosh/mergewatch-dashboard:latest` are hosted on GitHub Container Registry.
+
+  **Fix:** Authenticate with GHCR if pulling from a private registry:
+
+  ```bash
+  echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+  docker compose pull
+  ```
+
+  If the images are public, a `docker compose pull` without authentication should work.
+</Accordion>
+
+---
+
 ## Webhook not receiving events
 
-<Accordion title="GitHub App webhook URL does not match API Gateway URL">
-  The webhook URL configured on your GitHub App must exactly match the API Gateway endpoint printed during `npx mergewatch@latest init`.
+<Accordion title="GitHub App webhook URL does not match your server URL">
+  The webhook URL configured on your GitHub App must point to your MergeWatch server's publicly accessible URL.
 
-  **Fix:** Go to **GitHub Settings > Developer settings > GitHub Apps > your app > Webhook URL** and verify it matches your API Gateway URL (e.g. `https://abc123.execute-api.us-east-1.amazonaws.com/prod`).
+  **Fix:** Go to **GitHub Settings > Developer settings > GitHub Apps > your app > Webhook URL** and verify it points to your server (e.g. `https://mergewatch.example.com/webhook`). For local development, use a tunnel like ngrok.
 </Accordion>
 
 <Accordion title="Webhook secret mismatch">
-  The HMAC secret stored in SSM must match the secret configured on the GitHub App. A mismatch causes every delivery to fail signature validation.
+  The `GITHUB_WEBHOOK_SECRET` environment variable must match the secret configured on the GitHub App. A mismatch causes every delivery to fail signature validation.
 
-  **Fix:** Verify the SSM parameter value matches your GitHub App's webhook secret:
-
-  ```bash
-  aws ssm get-parameter \
-    --name "/mergewatch/{stage}/github-webhook-secret" \
-    --with-decryption \
-    --query "Parameter.Value" \
-    --output text
-  ```
-
-  Compare this with the value in **GitHub App settings > Webhook > Secret**.
+  **Fix:** Compare the value in your `.env` file with the value in **GitHub App settings > Webhook > Secret**. They must be identical.
 </Accordion>
 
-<Accordion title="Lambda not processing events">
-  Events may be arriving at API Gateway but failing inside the WebhookHandler Lambda.
-
-  **Fix:** Check the Lambda logs:
-
-  ```bash
-  npx mergewatch@latest logs
-  ```
-
-  Look for signature validation errors, missing environment variables, or Lambda invoke failures in the CloudWatch output.
-</Accordion>
+---
 
 ## Review not posting comments
 
@@ -47,27 +84,52 @@ description: "Common MergeWatch problems with causes and fixes."
   **Fix:** Go to **GitHub App settings > Permissions & events > Repository permissions** and confirm **Pull requests** is set to **Read & write**.
 </Accordion>
 
-<Accordion title="Bedrock model access not enabled">
-  Amazon Bedrock requires you to explicitly enable model access before invoking a model.
-
-  **Fix:** Open the **AWS Console > Amazon Bedrock > Model access** and enable the Claude model your deployment uses. This must be done in the same region as your deployment.
-</Accordion>
-
-<Accordion title="IAM role missing bedrock:InvokeModel">
-  The ReviewAgent Lambda's execution role must include the `bedrock:InvokeModel` permission.
-
-  **Fix:** Check the Lambda's execution role in the AWS Console and verify it has a policy allowing `bedrock:InvokeModel` on the model ARN. If you deployed with SAM, redeploy — the template includes this permission by default.
-</Accordion>
-
-<Accordion title="ReviewAgent Lambda errors">
-  **Fix:** Check the ReviewAgent Lambda logs directly:
+<Accordion title="LLM provider issues">
+  Reviews fail if MergeWatch cannot reach the configured LLM provider. Check the logs for specific error messages:
 
   ```bash
-  npm run logs:agent
+  docker compose logs mergewatch
   ```
 
-  Look for Bedrock API errors, permission denied responses, or timeout exceptions.
+  <AccordionGroup>
+    <Accordion title="Anthropic: invalid API key or rate limit">
+      Verify `ANTHROPIC_API_KEY` is correct and your account has sufficient credits. Check your usage at [console.anthropic.com](https://console.anthropic.com).
+    </Accordion>
+
+    <Accordion title="Bedrock: model access not enabled or throttling">
+      Amazon Bedrock requires you to explicitly enable model access before invoking a model.
+
+      - Open **AWS Console > Amazon Bedrock > Model access** and enable the model your deployment uses
+      - For throttling, request a quota increase in **AWS Console > Service Quotas > Amazon Bedrock**
+      - For higher throughput, use a cross-region inference profile:
+
+      ```yaml
+      # .mergewatch.yml
+      model: us.anthropic.claude-sonnet-4-20250514-v1:0
+      ```
+
+      <Tip>
+      The `us.` prefix enables cross-region inference across US regions, increasing effective throughput for production deployments.
+      </Tip>
+    </Accordion>
+
+    <Accordion title="LiteLLM: connection refused or auth error">
+      Verify `LITELLM_BASE_URL` is reachable from the MergeWatch container. If both run in Docker, they must be on the same Docker network. Check that `LITELLM_API_KEY` is set if your proxy requires authentication.
+    </Accordion>
+
+    <Accordion title="Ollama: model not found or connection refused">
+      Verify `OLLAMA_BASE_URL` is reachable from the MergeWatch container. Confirm the model is pulled:
+
+      ```bash
+      curl http://localhost:11434/api/tags
+      ```
+
+      If Ollama runs as a sidecar container, use its Docker network hostname, not `localhost`.
+    </Accordion>
+  </AccordionGroup>
 </Accordion>
+
+---
 
 ## "Skipped" on every PR
 
@@ -101,58 +163,27 @@ description: "Common MergeWatch problems with causes and fixes."
 <Accordion title="All changed files match excluded paths">
   MergeWatch auto-skips a PR when **every** changed file matches an excluded pattern (lock files, generated code, documentation, etc.).
 
-  **Fix:** Confirm the PR includes at least one source file that is not in an excluded path. Check the skip reason in the review record or Lambda logs.
-</Accordion>
-
-## Health check failing
-
-<Accordion title="Missing secret reported by health endpoint">
-  The health endpoint tells you which secret is missing. A missing SSM parameter typically means the install wizard was interrupted.
-
-  **Fix:** Run the health check and read the output:
+  **Fix:** Confirm the PR includes at least one source file that is not in an excluded path. Check the skip reason in the server logs:
 
   ```bash
-  npx mergewatch@latest health
-  ```
-
-  Re-run `npx mergewatch@latest init` to recreate missing parameters, or manually add them:
-
-  ```bash
-  aws ssm put-parameter \
-    --name "/mergewatch/{stage}/github-webhook-secret" \
-    --type SecureString \
-    --value "your-secret-value"
+  docker compose logs mergewatch
   ```
 </Accordion>
 
-<Accordion title="SSM parameter name mismatch">
-  All SSM parameters must follow the naming convention `/mergewatch/{stage}/*`. A different prefix causes lookups to fail.
-
-  **Fix:** List your SSM parameters and verify the path:
-
-  ```bash
-  aws ssm get-parameters-by-path \
-    --path "/mergewatch/prod/" \
-    --query "Parameters[].Name" \
-    --output table
-  ```
-
-  The stage in the SSM path must match the stage used during deployment.
-</Accordion>
+---
 
 ## Dashboard 401 / auth failing
 
 <Accordion title="NextAuth secret not set">
   The dashboard uses NextAuth for session management. A missing `NEXTAUTH_SECRET` causes all authentication to fail with a 401.
 
-  **Fix:** Set the environment variable on your dashboard deployment:
+  **Fix:** Generate and set the secret:
 
   ```bash
-  # Generate a random secret
   openssl rand -base64 32
   ```
 
-  Add the output as `NEXTAUTH_SECRET` in your environment configuration.
+  Add the output as `NEXTAUTH_SECRET` in your dashboard environment configuration.
 </Accordion>
 
 <Accordion title="GitHub OAuth callback URL mismatch">
@@ -168,74 +199,10 @@ description: "Common MergeWatch problems with causes and fixes."
 <Accordion title="NEXTAUTH_URL not set or incorrect">
   NextAuth needs the `NEXTAUTH_URL` variable to construct callback URLs. If it is missing or wrong, redirects break.
 
-  **Fix:** Set `NEXTAUTH_URL` to the canonical URL of your dashboard (e.g. `https://dashboard.mergewatch.dev`). Do not include a trailing slash.
+  **Fix:** Set `NEXTAUTH_URL` to the canonical URL of your dashboard (e.g. `https://dashboard.mergewatch.dev` for SaaS, or `http://localhost:3001` for self-hosted). Do not include a trailing slash.
 </Accordion>
 
-## SAM deploy failing
-
-<Accordion title="CloudFormation rollback">
-  A stack rollback means one or more resources failed to create or update.
-
-  **Fix:** Inspect the stack events to find the root cause:
-
-  ```bash
-  aws cloudformation describe-stack-events \
-    --stack-name mergewatch-prod \
-    --query "StackEvents[?ResourceStatus=='CREATE_FAILED'].[LogicalResourceId,ResourceStatusReason]" \
-    --output table
-  ```
-</Accordion>
-
-<Accordion title="IAM permissions for deploy role">
-  The IAM identity running `sam deploy` needs broad permissions to create the stack resources.
-
-  **Fix:** Ensure the deploy role or user has at minimum:
-
-  - `cloudformation:*`
-  - `lambda:*`
-  - `apigateway:*`
-  - `dynamodb:*`
-  - `sqs:*`
-  - `iam:PassRole`
-
-  <Warning>
-  For production, scope these permissions down to the specific resource ARNs after the initial deployment succeeds.
-  </Warning>
-</Accordion>
-
-<Accordion title="Wrong Node.js version">
-  MergeWatch requires Node.js 20 or later. SAM build fails if the local runtime is older.
-
-  **Fix:** Check your version and upgrade if needed:
-
-  ```bash
-  node --version
-  # Must be v20.x or later
-  ```
-</Accordion>
-
-## Bedrock throttling
-
-<Accordion title="Request quota exceeded">
-  Bedrock applies per-model, per-region request quotas. High review volume can hit these limits.
-
-  **Fix:** Request a quota increase in the **AWS Console > Service Quotas > Amazon Bedrock**.
-</Accordion>
-
-<Accordion title="Enable cross-region inference for higher throughput">
-  Cross-region inference profiles distribute requests across multiple regions, increasing effective throughput.
-
-  **Fix:** Set the model to a cross-region inference profile in your configuration:
-
-  ```yaml
-  # .mergewatch.yml
-  model: us.anthropic.claude-sonnet-4-20250514-v1:0
-  ```
-
-  <Tip>
-  The `us.` prefix enables cross-region inference across US regions. This is the recommended setting for production deployments.
-  </Tip>
-</Accordion>
+---
 
 ## Review taking too long (>5 minutes)
 
@@ -252,14 +219,11 @@ description: "Common MergeWatch problems with causes and fixes."
   Files beyond the limit are summarized rather than reviewed line-by-line.
 </Accordion>
 
-<Accordion title="Lambda cold start">
-  The first invocation after a period of inactivity incurs a cold start (5-10 seconds extra).
+<Accordion title="Slow LLM responses">
+  Response time depends on your LLM provider and the model you are using.
 
-  **Fix:** This is expected behavior. Subsequent invocations within the same warm period are faster. For consistently low latency, enable Lambda provisioned concurrency on the ReviewAgent function.
-</Accordion>
-
-<Accordion title="Bedrock region latency">
-  Some Bedrock regions experience higher latency during peak hours.
-
-  **Fix:** Check the Bedrock region's CloudWatch metrics for `InvocationLatency`. Consider switching to a region with lower latency or enabling [cross-region inference](#enable-cross-region-inference-for-higher-throughput).
+  **Fix:**
+  - **Anthropic / Bedrock:** Check provider status pages for outages. Consider switching to a faster model via `LLM_MODEL`.
+  - **LiteLLM:** Check your proxy's latency metrics and upstream provider status.
+  - **Ollama:** Ensure sufficient CPU/GPU resources. Smaller models (e.g. `llama3.1:8b`) respond faster but may produce lower-quality reviews.
 </Accordion>

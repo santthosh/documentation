@@ -1,85 +1,165 @@
 ---
 title: "Quickstart"
-description: "Go from zero to your first AI-powered PR review in 10 minutes."
+description: "Go from zero to your first AI-powered PR review in under 10 minutes."
 ---
 
-## Prerequisites
+Pick the path that fits your needs:
 
-Before you start, make sure you have:
+<CardGroup cols={2}>
+  <Card title="Managed SaaS" icon="cloud">
+    Install the GitHub App, no infrastructure to manage. First 20 PRs free.
+  </Card>
+  <Card title="Self-Hosted" icon="server">
+    `docker-compose up` on your infrastructure, your LLM, always free.
+  </Card>
+</CardGroup>
 
-<Check>Node.js 20 or later</Check>
-<Check>AWS CLI installed and configured with credentials</Check>
-<Check>SAM CLI installed</Check>
-<Check>An AWS account with Amazon Bedrock enabled</Check>
-<Check>Bedrock model access granted for Claude Sonnet</Check>
+<Tabs>
+  <Tab title="Managed SaaS">
 
-<Steps>
+    ## Get started with Managed SaaS
 
-<Step title="Run the install wizard">
+    No infrastructure to deploy. MergeWatch runs everything for you.
 
-```bash
-npx mergewatch@latest init
-```
+    <Steps>
+      <Step title="Install the GitHub App">
+        Go to [mergewatch.ai](https://mergewatch.ai) and click **Install GitHub App**. You will be redirected to GitHub to authorize MergeWatch.
+      </Step>
 
-The wizard handles everything:
+      <Step title="Select your repositories">
+        Choose **All repositories** or pick specific ones. Click **Install**.
 
-1. **Creates a GitHub App** via the manifest flow (your browser opens automatically)
-2. **Stores credentials** in AWS SSM Parameter Store
-3. **Deploys the stack** using SAM (Lambda, API Gateway, DynamoDB)
-4. **Prints the webhook URL** when finished
+        <Tip>
+        Start with a single test repository. You can add more repos at any time from **GitHub Settings > Applications > MergeWatch > Configure**.
+        </Tip>
+      </Step>
 
-<Note>
-The entire process takes about 5 minutes. You will be prompted to authenticate with GitHub and confirm the AWS deployment.
-</Note>
+      <Step title="Open a pull request">
+        Create or push a branch and open a pull request against any installed repository. MergeWatch picks it up automatically.
 
-</Step>
+        **What to expect:**
 
-<Step title="Install on your repos">
+        - The bot posts a review comment within **1--3 minutes**
+        - The review includes a summary, file-by-file findings, and a risk rating
+        - Findings are posted as inline review comments on the relevant lines
 
-After the wizard completes, install the GitHub App on the repositories you want reviewed:
+        <Warning>
+        If you don't see a review after 5 minutes, check the webhook delivery log in your GitHub App settings. See [Troubleshooting](/reference/troubleshooting) for common issues.
+        </Warning>
+      </Step>
+    </Steps>
 
-1. Go to your GitHub App's installation page (the wizard prints this URL)
-2. Select **All repositories** or pick specific ones
-3. Click **Install**
+  </Tab>
 
-<Tip>
-Start with a single test repository. You can add more repos at any time from GitHub Settings > Applications.
-</Tip>
+  <Tab title="Self-Hosted">
 
-</Step>
+    ## Get started with Self-Hosted
 
-<Step title="Open a pull request">
+    Run MergeWatch on your own infrastructure with Docker. No AWS account required.
 
-Create or push a branch and open a pull request against any installed repository. MergeWatch picks it up automatically.
+    ### Prerequisites
 
-**What to expect:**
+    <Note>
+    You only need Docker. No cloud CLIs, no Node.js, no build tools.
+    </Note>
 
-- The bot posts a comment within **1-3 minutes**
-- The review includes a summary, file-by-file findings, and a risk rating
-- Findings are posted as inline review comments on the relevant lines
+    - Docker 24.0+ and Docker Compose 2.20+
+    - A GitHub account with permission to create a GitHub App
 
-<Warning>
-If you don't see a review after 5 minutes, check the webhook delivery log in your GitHub App settings and the Lambda logs in CloudWatch. See [Troubleshooting](/reference/troubleshooting) for common issues.
-</Warning>
+    <Steps>
+      <Step title="Clone the repository">
+        ```bash
+        git clone https://github.com/santthosh/mergewatch.ai.git
+        cd mergewatch.ai
+        ```
+      </Step>
 
-</Step>
+      <Step title="Configure environment variables">
+        ```bash
+        cp .env.example .env
+        ```
 
-</Steps>
+        Edit `.env` and fill in the four required variables:
+
+        ```bash
+        GITHUB_APP_ID=your-app-id
+        GITHUB_PRIVATE_KEY=your-private-key
+        GITHUB_WEBHOOK_SECRET=your-webhook-secret
+        ANTHROPIC_API_KEY=your-anthropic-api-key
+        ```
+
+        <Note>
+        `DATABASE_URL` and `PORT` are handled automatically by docker-compose. The Postgres sidecar is included.
+        </Note>
+      </Step>
+
+      <Step title="Start MergeWatch">
+        ```bash
+        docker compose up -d
+        ```
+
+        Verify the server is running:
+
+        ```bash
+        docker compose logs mergewatch
+        ```
+
+        Look for: `Server listening on port 3000`
+      </Step>
+
+      <Step title="Register your webhook URL">
+        MergeWatch listens for GitHub webhooks at `/webhook` on port 3000. Your webhook URL is:
+
+        ```
+        https://your-domain.com/webhook
+        ```
+
+        <Tip>
+        **Running locally?** Use [ngrok](https://ngrok.com) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) to expose port 3000 to GitHub webhooks.
+        </Tip>
+
+        Configure this URL in your GitHub App settings under **Webhook URL**.
+      </Step>
+
+      <Step title="Install the GitHub App on your repositories">
+        1. Go to **GitHub Settings > Developer settings > GitHub Apps**
+        2. Find your MergeWatch app and click **Install App**
+        3. Choose **All repositories** or select specific ones
+        4. Click **Install**
+      </Step>
+
+      <Step title="Open a pull request">
+        Create or push a branch and open a pull request against any installed repository. MergeWatch picks it up automatically.
+
+        **What to expect:**
+
+        - The bot posts a review comment within **1--3 minutes**
+        - The review includes a summary, file-by-file findings, and a risk rating
+        - Findings are posted as inline review comments on the relevant lines
+
+        <Warning>
+        If you don't see a review after 5 minutes, check the webhook delivery log in your GitHub App settings and the container logs with `docker compose logs mergewatch`. See [Troubleshooting](/reference/troubleshooting) for common issues.
+        </Warning>
+      </Step>
+    </Steps>
+
+  </Tab>
+</Tabs>
 
 ## What happens next?
 
 <CardGroup cols={3}>
 
-<Card title="Explore the dashboard" icon="chart-line" href="/dashboard/overview">
-  View review history, token usage, and repository activity.
-</Card>
-
 <Card title="Configure review behavior" icon="sliders" href="/configuration/review-behavior">
   Tune sensitivity, skip paths, and add custom review instructions.
 </Card>
 
-<Card title="Set up BYOC" icon="key" href="/self-hosting/byoc">
-  Bring Your Own Cloud — point MergeWatch at your own Bedrock account for full control over model access and costs.
+<Card title="Choose an LLM provider" icon="brain" href="/self-hosting/llm-providers/anthropic">
+  Anthropic (default), LiteLLM, Amazon Bedrock, or Ollama.
+</Card>
+
+<Card title="Explore the dashboard" icon="chart-line" href="/dashboard/overview">
+  View review history, token usage, and repository activity.
 </Card>
 
 </CardGroup>

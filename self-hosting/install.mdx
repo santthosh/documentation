@@ -1,193 +1,123 @@
 ---
 title: "Install"
-description: "Deploy MergeWatch to your AWS account with a single command."
+description: "Deploy MergeWatch on your infrastructure with Docker Compose."
 ---
 
-The `npx mergewatch@latest init` wizard automates the entire setup: creating a GitHub App, storing credentials, and deploying infrastructure via AWS SAM.
+MergeWatch self-hosted runs as a Docker container with a PostgreSQL sidecar. The entire setup takes about 10 minutes.
 
 <Note>
-Most users arrive here from [Quickstart](/overview/quickstart). Make sure you have completed the [Prerequisites](/self-hosting/prerequisites) before continuing.
+Make sure you have completed the [Prerequisites](/self-hosting/prerequisites) before continuing.
 </Note>
 
-## What the wizard creates
-
-The wizard deploys the following infrastructure to your AWS account:
-
-| Resource | Details |
-|---|---|
-| **API Gateway** | HTTPS endpoint that receives GitHub webhooks |
-| **WebhookHandler Lambda** | Node.js 20.x, ARM64, 256 MB memory, 30 s timeout |
-| **ReviewAgent Lambda** | Node.js 20.x, ARM64, 1024 MB memory, 300 s timeout |
-| **DynamoDB Tables** | `mergewatch-installations` and `mergewatch-reviews` |
-| **SSM Parameters** | Encrypted credentials stored under `/mergewatch/{stage}/` |
-
-## Run the install wizard
+## Installation
 
 <Steps>
 
-<Step title="Start the wizard">
+<Step title="Clone the repository">
 
 ```bash
-npx mergewatch@latest init
-```
-
-You are prompted for an AWS region and a stage name (e.g. `prod`, `staging`). The stage name scopes all resources so you can run multiple environments side by side.
-
-```text
-$ npx mergewatch@latest init
-
-  __  __                   __        __    _       _
- |  \/  | ___ _ __ __ _  __\ \      / /_ _| |_ ___| |__
- | |\/| |/ _ \ '__/ _` |/ _ \ \ /\ / / _` | __/ __| '_ \
- | |  | |  __/ | | (_| |  __/\ V  V / (_| | || (__| | | |
- |_|  |_|\___|_|  \__, |\___| \_/\_/ \__,_|\__\___|_| |_|
-                   |___/
-
-? AWS Region: us-east-1
-? Stage name: prod
+git clone https://github.com/santthosh/mergewatch.ai.git
+cd mergewatch.ai
 ```
 
 </Step>
 
-<Step title="Create the GitHub App">
+<Step title="Configure environment variables">
 
-The wizard opens your browser to GitHub's app manifest flow. This creates a dedicated GitHub App under your account or organization.
-
-```text
-→ Opening browser to create GitHub App...
-→ Waiting for GitHub callback...
-✓ GitHub App "MergeWatch (prod)" created (App ID: 123456)
+```bash
+cp .env.example .env
 ```
+
+Edit `.env` and fill in the four required variables:
+
+```bash
+# Required
+GITHUB_APP_ID=123456
+GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+GITHUB_WEBHOOK_SECRET=your-webhook-secret
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Handled by docker-compose — no changes needed
+# DATABASE_URL=postgresql://mergewatch:mergewatch@postgres:5432/mergewatch
+# PORT=3000
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `GITHUB_APP_ID` | Yes | The numeric ID of your GitHub App |
+| `GITHUB_PRIVATE_KEY` | Yes | RSA private key for authenticating as the GitHub App |
+| `GITHUB_WEBHOOK_SECRET` | Yes | HMAC secret for validating webhook payloads |
+| `ANTHROPIC_API_KEY` | Yes | API key from [console.anthropic.com](https://console.anthropic.com) |
+| `LLM_PROVIDER` | No | Default: `anthropic`. Options: `anthropic`, `litellm`, `bedrock`, `ollama` |
+| `DATABASE_URL` | No | Set automatically by docker-compose (Postgres sidecar) |
+| `PORT` | No | Default: `3000` |
 
 <Tip>
-The manifest flow pre-fills all required permissions and webhook event subscriptions. You do not need to configure anything manually. See [Permissions](/github-app/permissions) for the full list.
+To use a different LLM provider, set `LLM_PROVIDER` and the provider-specific variables. See [LLM Providers](/self-hosting/llm-providers/anthropic).
 </Tip>
 
-**What happens during the manifest flow:**
+</Step>
 
-1. Your browser opens the GitHub App registration page with a pre-filled manifest
-2. You review the app name, permissions, and webhook events
-3. You click **Create GitHub App**
-4. GitHub redirects back to the CLI with the app credentials
+<Step title="Start MergeWatch">
+
+```bash
+docker compose up -d
+```
+
+This starts two containers:
+- **mergewatch** — the Express server on port 3000
+- **postgres** — PostgreSQL database
+
+Database migrations run automatically on first startup.
+
+</Step>
+
+<Step title="Verify the deployment">
+
+Check that the server is running:
+
+```bash
+docker compose logs mergewatch
+```
+
+Look for this line in the output:
+
+```
+Server listening on port 3000
+```
 
 <Warning>
-Do not close the terminal while the browser is open. The CLI is waiting for the callback from GitHub to continue.
+If the server fails to start, check that your `.env` file has all four required variables set correctly. See [Troubleshooting](/reference/troubleshooting) for common issues.
 </Warning>
 
 </Step>
 
-<Step title="Credentials are stored in SSM">
+<Step title="Register your webhook URL">
 
-The wizard automatically stores three secrets in AWS SSM Parameter Store, encrypted with your account's default KMS key:
+MergeWatch listens for GitHub webhooks at `/webhook` on port 3000. Configure your GitHub App's webhook URL to:
 
-```text
-✓ Stored /mergewatch/prod/github-app-id
-✓ Stored /mergewatch/prod/github-private-key
-✓ Stored /mergewatch/prod/github-webhook-secret
+```
+https://your-domain.com/webhook
 ```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `/mergewatch/{stage}/github-app-id` | `String` | The numeric GitHub App ID |
-| `/mergewatch/{stage}/github-private-key` | `SecureString` | RSA private key for authenticating as the App |
-| `/mergewatch/{stage}/github-webhook-secret` | `SecureString` | HMAC secret for validating webhook payloads |
+Set the webhook URL in **GitHub Settings > Developer settings > GitHub Apps > Your App > Webhook URL**.
 
 <Note>
-All `SecureString` parameters are encrypted at rest using AWS KMS. The Lambda functions decrypt them at runtime via IAM policies scoped to these specific parameter paths.
+**Running locally?** Use [ngrok](https://ngrok.com) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) to expose port 3000 to the internet so GitHub can deliver webhooks.
+
+```bash
+ngrok http 3000
+```
+
+Use the generated `https://...ngrok-free.app/webhook` URL as your webhook URL.
 </Note>
 
-You can verify the stored parameters at any time:
-
-```bash
-aws ssm get-parameters-by-path \
-  --path "/mergewatch/prod/" \
-  --query "Parameters[].Name" \
-  --output table
-```
-
 </Step>
 
-<Step title="SAM build and deploy">
+<Step title="Install the GitHub App on your repositories">
 
-The wizard runs `sam build` and `sam deploy` automatically. This takes 2-3 minutes on a typical connection.
-
-```text
-→ Building SAM application...
-✓ Build complete
-
-→ Deploying stack "mergewatch-prod"...
-
-CloudFormation events:
-  CREATE_COMPLETE    AWS::DynamoDB::Table       InstallationsTable
-  CREATE_COMPLETE    AWS::DynamoDB::Table       ReviewsTable
-  CREATE_COMPLETE    AWS::Lambda::Function      WebhookHandlerFunction
-  CREATE_COMPLETE    AWS::Lambda::Function      ReviewAgentFunction
-  CREATE_COMPLETE    AWS::ApiGateway::RestApi   WebhookApi
-
-✓ Stack "mergewatch-prod" deployed successfully
-```
-
-</Step>
-
-<Step title="Webhook URL is printed">
-
-When the deploy finishes, the wizard prints the webhook URL and the GitHub App installation link.
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│  ✓ MergeWatch deployed successfully!                         │
-│                                                              │
-│  Webhook URL:                                                │
-│  https://abc123.execute-api.us-east-1.amazonaws.com/prod     │
-│                                                              │
-│  Install your GitHub App:                                    │
-│  https://github.com/apps/mergewatch-prod/installations/new   │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
-
-The webhook URL has already been configured on the GitHub App. No manual wiring is needed.
-
-</Step>
-
-</Steps>
-
-## Verify the deployment
-
-Run the built-in health check to confirm everything is working:
-
-```bash
-npx mergewatch@latest health
-```
-
-A healthy deployment produces output like this:
-
-```text
-$ npx mergewatch@latest health
-
-Checking MergeWatch (prod) in us-east-1...
-
-  ✓ SSM parameters exist
-  ✓ WebhookHandler Lambda is active
-  ✓ ReviewAgent Lambda is active
-  ✓ DynamoDB tables exist
-  ✓ API Gateway endpoint responds (200 OK)
-  ✓ GitHub App credentials are valid
-
-All checks passed.
-```
-
-<Warning>
-If any check fails, see [Troubleshooting](/reference/troubleshooting) for common issues and fixes.
-</Warning>
-
-## Install the GitHub App on your repositories
-
-After deploying, install the GitHub App so MergeWatch can receive webhook events from your repositories.
-
-1. Open the installation URL printed by the wizard (or find your app at **GitHub Settings > Developer settings > GitHub Apps**)
-2. Click **Install App**
+1. Go to **GitHub Settings > Developer settings > GitHub Apps**
+2. Find your MergeWatch app and click **Install App**
 3. Choose **All repositories** or select specific ones
 4. Click **Install**
 
@@ -197,43 +127,43 @@ Start with a single test repository. You can add more repos at any time from **G
 
 For detailed guidance, see [Organization install](/github-app/org-install) or [Personal install](/github-app/personal-install).
 
+</Step>
+
+</Steps>
+
 ## Your first pull request
 
 Open a pull request against any installed repository. MergeWatch picks it up automatically.
 
 **What to expect:**
 
-- The `WebhookHandler` Lambda receives the `pull_request.opened` event and invokes the ReviewAgent Lambda asynchronously
-- The `ReviewAgent` Lambda fetches the diff from GitHub and sends it to Amazon Bedrock
-- A review comment appears on the pull request within **1-3 minutes**
+- The Express server receives the `pull_request.opened` webhook event
+- The review pipeline fetches the diff and sends it to your LLM provider
+- A review comment appears on the pull request within **1--3 minutes**
 
 The review includes:
 - A summary of the changes
 - File-by-file findings posted as inline review comments
 - A risk rating (low, medium, high)
 
-<Note>
-The first invocation of each Lambda may experience a cold start, adding 5-10 seconds. Subsequent reviews are faster.
-</Note>
-
 ## Next steps
 
 <CardGroup cols={2}>
+
+<Card title="LLM Providers" icon="brain" href="/self-hosting/llm-providers/anthropic">
+  Switch from Anthropic to LiteLLM, Bedrock, or Ollama.
+</Card>
+
+<Card title="Platform Guides" icon="cloud" href="/self-hosting/platforms/google-cloud-run">
+  Deploy to Google Cloud Run, AWS ECS, Azure, Fly.io, Railway, or bare metal.
+</Card>
 
 <Card title="Configure review behavior" icon="sliders" href="/configuration/review-behavior">
   Tune sensitivity, ignored paths, and review focus areas.
 </Card>
 
-<Card title="Manual install" icon="terminal" href="/self-hosting/manual-install">
-  Step-by-step instructions if you prefer to run each step yourself.
-</Card>
-
-<Card title="Bring Your Own Cloud" icon="key" href="/self-hosting/byoc">
-  Use your own AWS account for Bedrock model access and cost control.
-</Card>
-
-<Card title="CLI reference" icon="book" href="/reference/cli">
-  Full list of CLI commands including health, status, and logs.
+<Card title="Upgrading" icon="arrow-up" href="/self-hosting/upgrading">
+  Keep MergeWatch up to date with the latest features and fixes.
 </Card>
 
 </CardGroup>

@@ -1,56 +1,87 @@
 ---
 title: "Environment Variables"
-description: "Lambda environment variables used by MergeWatch — all managed by the SAM template."
+description: "All environment variables used by MergeWatch in self-hosted and SaaS deployment modes."
 ---
 
+## Self-Hosted Variables
+
+These variables are configured in your `.env` file or passed directly to `docker compose`.
+
 <Note>
-All Lambda environment variables are read from SSM at cold start. Never set these manually — the wizard and SAM template handle them.
+Self-hosted deployments use a `.env` file alongside `docker-compose.yml`. See the [install guide](/self-hosting/install) for the recommended setup path.
 </Note>
 
-## Variable reference
+### Core
 
-| Variable                       | Source           | Description                                  |
-| ------------------------------ | ---------------- | -------------------------------------------- |
-| `GITHUB_APP_ID`                | SSM SecureString | Numeric GitHub App ID                        |
-| `GITHUB_PRIVATE_KEY`           | SSM SecureString | PEM-encoded RSA private key                  |
-| `GITHUB_WEBHOOK_SECRET`        | SSM SecureString | HMAC secret for payload validation           |
-| `GITHUB_APP_SLUG`              | SSM String       | GitHub App slug (used in installation URLs)  |
-| `BEDROCK_MODEL_ID`             | SAM config       | Default model for all agents                 |
-| `BEDROCK_LIGHT_MODEL_ID`       | SAM config       | Light model for summary/low-complexity tasks |
-| `BEDROCK_REGION`               | SAM config       | AWS region for Bedrock API calls             |
-| `DYNAMODB_INSTALLATIONS_TABLE` | SAM output       | Installations DynamoDB table name            |
-| `DYNAMODB_REVIEWS_TABLE`       | SAM output       | Reviews DynamoDB table name                  |
-| `STAGE`                        | SAM config       | Deployment stage (`prod`, `staging`, etc.)   |
-| `VERSION`                      | Build            | Deployed version (injected at build time)    |
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `GITHUB_APP_ID` | Yes | — | Numeric GitHub App ID from your app settings page |
+| `GITHUB_PRIVATE_KEY` | Yes | — | PEM-encoded RSA private key generated for the GitHub App |
+| `GITHUB_WEBHOOK_SECRET` | Yes | — | HMAC secret used to validate incoming webhook payloads |
+| `DATABASE_URL` | Yes | — | Postgres connection string, e.g. `postgresql://user:pass@postgres:5432/mergewatch` |
+| `LLM_PROVIDER` | Yes | `anthropic` | LLM backend to use: `anthropic`, `litellm`, `bedrock`, or `ollama` |
+| `LLM_MODEL` | No | — | Override the default model for the selected provider |
+| `PORT` | No | `3000` | Port the MergeWatch server listens on inside the container |
+
+### Provider-specific: Anthropic
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `ANTHROPIC_API_KEY` | If `LLM_PROVIDER=anthropic` | — | API key from [console.anthropic.com](https://console.anthropic.com) |
+
+### Provider-specific: LiteLLM
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `LITELLM_BASE_URL` | If `LLM_PROVIDER=litellm` | — | Base URL of your LiteLLM proxy, e.g. `http://litellm:4000` |
+| `LITELLM_API_KEY` | No | — | Optional API key if your LiteLLM proxy requires authentication |
+
+### Provider-specific: Ollama
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `OLLAMA_BASE_URL` | If `LLM_PROVIDER=ollama` | `http://localhost:11434` | Base URL of the Ollama server |
+
+### Provider-specific: AWS Bedrock
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `AWS_REGION` | If `LLM_PROVIDER=bedrock` | — | AWS region for Bedrock API calls |
+| `AWS_ACCESS_KEY_ID` | If `LLM_PROVIDER=bedrock` | — | AWS access key (or use an instance profile instead) |
+| `AWS_SECRET_ACCESS_KEY` | If `LLM_PROVIDER=bedrock` | — | AWS secret key (or use an instance profile instead) |
+
+<Tip>
+If you run MergeWatch on an EC2 instance or ECS task with an IAM instance profile or task role that has Bedrock permissions, you can omit `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The AWS SDK will pick up credentials automatically.
+</Tip>
+
+---
+
+## SaaS Lambda Variables
 
 <Warning>
-SSM SecureString parameters are encrypted at rest and in transit. The Lambda function decrypts them at cold start and caches the values for the lifetime of the execution environment.
+These variables are used internally by the MergeWatch SaaS infrastructure. They are documented here for reference only and are **not user-configurable**.
 </Warning>
 
-## Source categories
+The SaaS deployment runs on AWS Lambda and does not use `LLM_PROVIDER`, `DATABASE_URL`, or any of the self-hosted provider variables. Bedrock access is handled via the Lambda execution role.
 
-<AccordionGroup>
-  <Accordion title="SSM SecureString">
-    These values are stored as encrypted SSM parameters under the path `/mergewatch/<stage>/`. They contain sensitive credentials and are never logged or exposed in CloudFormation outputs.
-  </Accordion>
-  <Accordion title="SAM config">
-    These values are set in `samconfig.toml` and passed as CloudFormation parameters during deployment. They are visible in the CloudFormation console.
-  </Accordion>
-  <Accordion title="SAM output">
-    These values are generated by CloudFormation during stack creation and automatically injected into the Lambda environment. They reference the physical resource names of deployed infrastructure.
-  </Accordion>
-  <Accordion title="Build">
-    These values are injected at build time by the CLI or CI/CD pipeline. They are baked into the deployment artifact.
-  </Accordion>
-</AccordionGroup>
+| Variable | Description |
+| --- | --- |
+| `DEPLOYMENT_MODE` | Always set to `saas` |
+| `INSTALLATIONS_TABLE` | DynamoDB table name for GitHub App installations |
+| `REVIEWS_TABLE` | DynamoDB table name for review records |
+| `STRIPE_SECRET_KEY` | Stripe API secret key for billing |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `STRIPE_PRICE_ID` | Stripe Price ID for the per-PR pricing plan |
+
+---
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="SAM Template" icon="layer-group" href="/deployment/sam-template">
-    See how these variables are defined in the SAM template.
+  <Card title="Install Guide" icon="download" href="/self-hosting/install">
+    Set up MergeWatch with Docker Compose.
   </Card>
   <Card title="CLI Reference" icon="terminal" href="/reference/cli">
-    Use the CLI to manage your deployment.
+    Manage your SaaS deployment with the CLI.
   </Card>
 </CardGroup>

@@ -5,7 +5,15 @@ description: Architecture, data flow, and multi-agent pipeline internals.
 
 ## Architecture overview
 
-When a pull request is opened (or updated), GitHub sends a webhook to MergeWatch. The event flows through a serverless pipeline that ends with review comments posted back to the PR.
+When a pull request is opened (or updated), GitHub sends a webhook to MergeWatch. The event flows through a review pipeline that ends with review comments posted back to the PR.
+
+MergeWatch supports two deployment modes with different architectures. The review pipeline and agent behavior are identical in both.
+
+### SaaS architecture
+
+<Note>
+This diagram shows the managed SaaS architecture running in MergeWatch's AWS account.
+</Note>
 
 ```mermaid
 sequenceDiagram
@@ -17,7 +25,7 @@ sequenceDiagram
     participant DB as DynamoDB
 
     GH->>AG: POST /webhook (pull_request event)
-    AG->>WH: Invoke (256MB, 30s timeout)
+    AG->>WH: Invoke (512MB, 30s timeout)
     WH->>WH: Validate HMAC-SHA256 signature
     WH->>RA: Async invoke (InvocationType.Event)
     RA->>GH: Fetch PR diff via GitHub API
@@ -31,8 +39,38 @@ sequenceDiagram
     BR-->>RA: Agent findings (JSON)
     RA->>BR: Orchestrator (dedup + rank)
     BR-->>RA: Final review payload
-    RA->>DB: Write review record (90-day TTL)
+    RA->>DB: Write review record
     RA->>GH: Post Check Run + review comments
+```
+
+### Self-Hosted architecture
+
+<Note>
+This diagram shows the self-hosted architecture running on your infrastructure with Docker.
+</Note>
+
+```mermaid
+sequenceDiagram
+    participant GH as GitHub
+    participant EX as Express Server (Docker)
+    participant LLM as LLM Provider
+    participant PG as PostgreSQL
+
+    GH->>EX: POST /webhook (pull_request event)
+    EX->>EX: Validate HMAC-SHA256 signature
+    EX->>GH: Fetch PR diff via GitHub API
+    par Parallel agent invocations
+        EX->>LLM: Security agent
+        EX->>LLM: Bug detection agent
+        EX->>LLM: Style agent
+        EX->>LLM: Summary agent
+        EX->>LLM: Diagram agent
+    end
+    LLM-->>EX: Agent findings (JSON)
+    EX->>LLM: Orchestrator (dedup + rank)
+    LLM-->>EX: Final review payload
+    EX->>PG: Write review record
+    EX->>GH: Post Check Run + review comments
 ```
 
 ## Step-by-step flow
@@ -42,13 +80,18 @@ sequenceDiagram
     A developer opens a pull request or pushes new commits. GitHub fires a `pull_request` webhook event (`opened`, `synchronize`, or `reopened`).
   </Step>
   <Step title="Webhook received">
-    API Gateway receives the POST request and invokes the **WebhookHandler Lambda** (256 MB, 30 s timeout). The handler validates the payload against the webhook secret using HMAC-SHA256. Invalid signatures are rejected with a 401.
+    **SaaS:** API Gateway receives the POST request and invokes the WebhookHandler Lambda (512 MB, 30 s timeout).
+
+    **Self-Hosted:** The Express server receives the POST request on the `/webhook` endpoint (port 3000).
+
+    In both modes, the handler validates the payload against the webhook secret using HMAC-SHA256. Invalid signatures are rejected with a 401.
   </Step>
-  <Step title="Async invocation">
-    The handler invokes the **ReviewAgent Lambda** asynchronously using `lambda:InvokeFunction` with `InvocationType.Event` (fire-and-forget). The call returns immediately with a 202 status. AWS Lambda's built-in async invocation queue handles delivery, with up to 2 automatic retries on failure.
-  </Step>
-  <Step title="ReviewAgent invoked">
-    The **ReviewAgent Lambda** (1024 MB, 300 s timeout) picks up the event from Lambda's internal async queue. The agent fetches the PR diff from the GitHub API using the installation token, then fans out to five specialized agents.
+  <Step title="Review pipeline starts">
+    **SaaS:** The handler invokes the ReviewAgent Lambda asynchronously using `InvocationType.Event` (fire-and-forget). The ReviewAgent Lambda (1024 MB, 300 s timeout) picks up the event.
+
+    **Self-Hosted:** The Express server processes the review in the same process, running the agent pipeline asynchronously after acknowledging the webhook.
+
+    In both modes, the PR diff is fetched from the GitHub API using the installation token, then fanned out to five specialized agents.
   </Step>
   <Step title="Multi-agent parallel review">
     Five agents run concurrently via `Promise.all()` — see [the pipeline](#the-multi-agent-pipeline) below. Each agent receives the diff and returns structured JSON findings.
@@ -57,13 +100,17 @@ sequenceDiagram
     The orchestrator agent receives all findings, deduplicates overlapping comments, ranks by severity and confidence, and produces a merge readiness score (1--5).
   </Step>
   <Step title="Results posted to GitHub">
-    MergeWatch posts a **Check Run** with a status and conclusion, plus inline review comments on the relevant lines. The review record is written to DynamoDB with a 90-day TTL.
+    MergeWatch posts a **Check Run** with a status and conclusion, plus inline review comments on the relevant lines.
+
+    **SaaS:** The review record is written to DynamoDB.
+
+    **Self-Hosted:** The review record is written to PostgreSQL.
   </Step>
 </Steps>
 
 ## The multi-agent pipeline
 
-Five specialized agents run in parallel. Each is a separate Bedrock invocation with a focused system prompt.
+Five specialized agents run in parallel. Each is a separate LLM invocation with a focused system prompt.
 
 | Agent | Responsibility | Example finding |
 |---|---|---|
@@ -131,84 +178,75 @@ MergeWatch v0.1 operates at **diff-only** awareness. The agents see the PR diff 
 
 ## Infrastructure details
 
+### Self-Hosted
+
+<CardGroup cols={2}>
+  <Card title="Express Server (Docker)">
+    - **Image:** `ghcr.io/santthosh/mergewatch:latest`
+    - **Port:** 3000
+    - **Webhook endpoint:** `/webhook`
+    - **Role:** Validate signature, fetch diff, invoke agents, run orchestrator, post results
+  </Card>
+  <Card title="PostgreSQL">
+    - **Storage:** Review history, installation config, repo settings
+    - **ORM:** Drizzle ORM (`packages/storage-postgres`)
+    - **Managed by:** Docker Compose sidecar
+  </Card>
+</CardGroup>
+
+### SaaS
+
 <CardGroup cols={2}>
   <Card title="WebhookHandler Lambda">
-    - **Memory:** 256 MB
+    - **Memory:** 512 MB
     - **Timeout:** 30 seconds
     - **Role:** Validate HMAC-SHA256 signature, parse event, invoke ReviewAgent (async)
-    - **Concurrency:** Unreserved (scales with API Gateway)
   </Card>
   <Card title="ReviewAgent Lambda">
     - **Memory:** 1024 MB
     - **Timeout:** 300 seconds (5 min)
     - **Role:** Fetch diff, invoke agents, run orchestrator, post results
-    - **Concurrency:** Triggered by async Lambda invoke (one invocation per event)
   </Card>
   <Card title="DynamoDB Tables">
     - **`installations`** — GitHub App installation config, repo settings
-    - **`reviews`** — Review history, agent findings, scores (90-day TTL)
+    - **`reviews`** — Review history, agent findings, scores
     - **Billing mode:** On-demand (pay-per-request)
+  </Card>
+  <Card title="Amazon Bedrock">
+    - **Default model:** `us.anthropic.claude-sonnet-4-20250514-v1:0`
+    - **Role:** Powers all five review agents and the orchestrator
   </Card>
 </CardGroup>
 
-## Data flow and deployment models
+## Data flow
 
-Where your data goes depends on which deployment model you choose. This matters — read it carefully.
+Where your data goes depends on which deployment model you choose.
 
-### Self-hosted
-
-```mermaid
-flowchart LR
-    subgraph your["Your AWS Account"]
-        direction LR
-        GH["GitHub"] -->|webhook| AG["API Gateway"]
-        AG --> WH["WebhookHandler"]
-        WH -->|async invoke| RA["ReviewAgent"]
-        RA -->|fetch diff| GH
-        RA --> BR["Bedrock"]
-        RA --> DB["DynamoDB"]
-        RA -->|post comments| GH
-    end
-
-    style your fill:#0d1117,stroke:#00ff88,color:#fff
-```
-
-**Everything stays in your AWS account.** MergeWatch has zero access. You deploy the SAM template, you own the stack, you see every log in your CloudWatch. MergeWatch (the company) never sees your code, your diffs, your review results, or your Bedrock usage.
-
-### BYOC (Bring Your Own Cloud)
+### Self-Hosted
 
 ```mermaid
 flowchart LR
-    GH["GitHub"] -->|webhook| AG
-
-    subgraph mw["MergeWatch Infra"]
+    subgraph yours["Your Infrastructure"]
         direction LR
-        AG["API Gateway"] --> WH["WebhookHandler"]
-        WH -->|async invoke| RA["ReviewAgent"]
-        RA --> DB["DynamoDB"]
+        GH["GitHub"] -->|webhook| EX["Express Server"]
+        EX -->|fetch diff| GH
+        EX --> LLM["LLM Provider"]
+        EX --> PG["PostgreSQL"]
+        EX -->|post comments| GH
     end
 
-    subgraph yours["Your AWS Account"]
-        BR["Bedrock"]
-    end
-
-    RA -->|"sts:AssumeRole"| BR
-    RA -->|fetch diff| GH
-    RA -->|post comments| GH
-
-    style mw fill:#0d1117,stroke:#3b82f6,color:#fff
     style yours fill:#0d1117,stroke:#00ff88,color:#fff
 ```
 
-The PR diff transits MergeWatch's Lambda during processing. The Bedrock invocation goes to **your** AWS account via a cross-account role. Review results are stored in MergeWatch's DynamoDB. Your code is processed in MergeWatch infrastructure but the LLM call happens in your account.
+**Everything stays on your infrastructure.** MergeWatch has zero access. You run the Docker container, you own the data, you see every log. MergeWatch (the company) never sees your code, your diffs, your review results, or your LLM usage.
 
-### SaaS
+### Managed SaaS
 
 ```mermaid
 flowchart LR
     GH["GitHub"] -->|webhook| AG
 
-    subgraph mw["MergeWatch Infra"]
+    subgraph mw["MergeWatch Infrastructure"]
         direction LR
         AG["API Gateway"] --> WH["WebhookHandler"]
         WH -->|async invoke| RA["ReviewAgent"]
@@ -225,13 +263,11 @@ flowchart LR
 Everything runs in MergeWatch's infrastructure. Your diff is processed by MergeWatch's Lambda and sent to MergeWatch's Bedrock. This is the fastest setup but offers the least data isolation.
 
 <Warning title="What data does MergeWatch see?">
-**Self-hosted:** Nothing. MergeWatch has no access to your AWS account, your code, your diffs, or your review results. Zero telemetry is sent back.
+**Self-hosted:** Nothing. MergeWatch has no access to your infrastructure, your code, your diffs, or your review results. Zero telemetry is sent back.
 
-**BYOC:** MergeWatch's Lambda reads the PR diff to construct the Bedrock prompt. The diff transits MergeWatch infrastructure. The Bedrock call itself goes to your account — MergeWatch never sees the raw model response. Review metadata (file names, line numbers, finding summaries) is stored in MergeWatch's DynamoDB.
+**Managed SaaS:** MergeWatch sees everything: the diff, the LLM prompts and responses, and the review results. This is the trade-off for zero-setup convenience.
 
-**SaaS:** MergeWatch sees everything: the diff, the Bedrock prompts and responses, and the review results. This is the trade-off for zero-setup convenience.
-
-If your security posture requires that code never leave your infrastructure, use **self-hosted**. If you want managed infrastructure but control over the LLM layer, use **BYOC**.
+If your security posture requires that code never leave your infrastructure, use **self-hosted**.
 </Warning>
 
 ## Check Runs

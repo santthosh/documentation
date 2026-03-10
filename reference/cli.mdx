@@ -1,41 +1,66 @@
 ---
 title: "CLI Reference"
-description: "Every command, flag, and option for the MergeWatch CLI."
+description: "CLI commands for MergeWatch SaaS management, plus Docker commands for self-hosted deployments."
 ---
+
+<Warning>
+The MergeWatch CLI (`npx mergewatch@latest`) is for **SaaS deployments only**. Self-hosted users do not use the CLI — installation is done by cloning the repository, configuring a `.env` file, and running `docker compose up`. See the [self-hosted install guide](/self-hosting/install).
+</Warning>
+
+## Self-Hosted: Docker Commands
+
+Self-hosted MergeWatch is managed entirely with Docker Compose. There is no CLI wizard for self-hosted deployments.
+
+| Command | Description |
+| --- | --- |
+| `docker compose up -d` | Start MergeWatch, Postgres, and the dashboard in the background |
+| `docker compose down` | Stop and remove all containers |
+| `docker compose pull` | Pull the latest container images |
+| `docker compose logs -f mergewatch` | Tail the MergeWatch server logs |
+| `docker compose logs -f dashboard` | Tail the dashboard logs |
+| `docker compose logs -f postgres` | Tail the Postgres logs |
+| `docker compose ps` | Show running container status |
+| `docker compose restart mergewatch` | Restart the MergeWatch server |
+
+<Tip>
+Use `docker compose pull && docker compose up -d` to upgrade to the latest version. Docker will recreate only the containers whose images have changed.
+</Tip>
+
+---
+
+## SaaS: CLI Commands
 
 ```bash
 npx mergewatch@latest <command>
 ```
 
-## Commands
-
-| Command   | Description                                             |
-| --------- | ------------------------------------------------------- |
-| `init`    | Run the setup wizard (create GitHub App, deploy to AWS) |
-| `upgrade` | Upgrade to latest version                               |
-| `health`  | Check stack health                                      |
-| `logs`    | Tail CloudWatch Lambda logs                             |
-| `check`   | Verify all prerequisites                                |
-| `version` | Show installed version                                  |
+| Command   | Description                                     |
+| --------- | ----------------------------------------------- |
+| `init`    | Run the SaaS setup wizard (create GitHub App, configure billing) |
+| `upgrade` | Upgrade your SaaS deployment to the latest version |
+| `health`  | Check the health of your SaaS stack             |
+| `logs`    | Tail CloudWatch Lambda logs                     |
+| `check`   | Verify all prerequisites                        |
+| `version` | Show installed CLI version                      |
 
 ---
 
-## init
+### init
 
-Run the interactive setup wizard. This creates a GitHub App via manifest flow, stores credentials in SSM, and deploys the full stack with SAM.
+Run the interactive setup wizard for the SaaS deployment. This creates a GitHub App via manifest flow and configures your account.
 
 ```bash
 npx mergewatch@latest init
 ```
 
-### Flags
+#### Flags
 
-| Flag                | Description                | Default     |
-| ------------------- | -------------------------- | ----------- |
-| `--stage <name>`    | Stack stage name           | `prod`      |
-| `--region <region>` | AWS region                 | `us-east-1` |
-| `--profile <name>`  | AWS CLI profile to use     | —           |
-| `--yes`             | Skip confirmation prompts  | `false`     |
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--stage <name>` | Stack stage name | `prod` |
+| `--region <region>` | AWS region | `us-east-1` |
+| `--profile <name>` | AWS CLI profile to use | — |
+| `--yes` | Skip confirmation prompts | `false` |
 
 <Tip>
 Use `--yes` in CI/CD pipelines to skip all interactive prompts. Make sure all prerequisites pass `check` first.
@@ -43,35 +68,35 @@ Use `--yes` in CI/CD pipelines to skip all interactive prompts. Make sure all pr
 
 ---
 
-## upgrade
+### upgrade
 
-Pulls the latest SAM template, runs `sam deploy` with your existing `samconfig.toml`, and runs a health check.
+Deploys the latest version of the SaaS stack and runs a health check.
 
 ```bash
 npx mergewatch@latest upgrade
 ```
 
 <Note>
-The upgrade command preserves your existing configuration. It reads `samconfig.toml` from your project root and applies only infrastructure changes.
+The upgrade command preserves your existing configuration. It applies only infrastructure changes.
 </Note>
 
 ---
 
-## health
+### health
 
-Check the health of your deployed MergeWatch stack.
+Check the health of your deployed SaaS stack.
 
 ```bash
 npx mergewatch@latest health
 ```
 
-### Flags
+#### Flags
 
-| Flag                | Description                    | Default |
-| ------------------- | ------------------------------ | ------- |
-| `--stage <name>`    | Stage to check                 | `prod`  |
-| `--region <region>` | AWS region                     | —       |
-| `--json`            | Output as JSON (for scripting) | `false` |
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--stage <name>` | Stage to check | `prod` |
+| `--region <region>` | AWS region | — |
+| `--json` | Output as JSON (for scripting) | `false` |
 
 <CodeGroup>
 ```bash Human-readable output
@@ -85,23 +110,23 @@ npx mergewatch@latest health --stage prod --json
 
 ---
 
-## logs
+### logs
 
-Tail CloudWatch Lambda logs in real time.
+Tail CloudWatch Lambda logs in real time. This is a SaaS-only command — self-hosted users should use `docker compose logs` instead.
 
 ```bash
 npx mergewatch@latest logs
 ```
 
-### Flags
+#### Flags
 
-| Flag                | Description                     | Default |
-| ------------------- | ------------------------------- | ------- |
-| `--stage <name>`    | Stage                           | `prod`  |
-| `--region <region>` | AWS region                      | —       |
-| `--function <name>` | `webhook` or `agent`            | `agent` |
-| `--since <time>`    | e.g., `5m`, `1h`, `2024-01-01` | —       |
-| `--filter <str>`    | CloudWatch filter pattern       | —       |
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--stage <name>` | Stage | `prod` |
+| `--region <region>` | AWS region | — |
+| `--function <name>` | `webhook` or `agent` | `agent` |
+| `--since <time>` | e.g., `5m`, `1h`, `2024-01-01` | — |
+| `--filter <str>` | CloudWatch filter pattern | — |
 
 <CodeGroup>
 ```bash Tail agent logs
@@ -119,15 +144,13 @@ npx mergewatch@latest logs --function webhook --since 30m
 
 ---
 
-## check
+### check
 
-Verifies that all prerequisites are installed and configured:
+Verifies that all prerequisites are installed and configured for a SaaS deployment:
 
 - **Node.js** — required runtime
 - **AWS CLI** — required for credential management
-- **SAM CLI** — required for deployment
 - **AWS credentials** — valid credentials in the current profile
-- **Bedrock model access** — confirms the configured model is available in the target region
 
 ```bash
 npx mergewatch@latest check
@@ -139,7 +162,7 @@ If any check fails, `init` and `upgrade` will refuse to proceed. Fix the reporte
 
 ---
 
-## version
+### version
 
 Prints the currently installed CLI version.
 
@@ -152,10 +175,10 @@ npx mergewatch@latest version
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Install MergeWatch" icon="download" href="/self-hosting/install">
-    Get started with the setup wizard.
+  <Card title="Self-Hosted Install" icon="download" href="/self-hosting/install">
+    Set up MergeWatch with Docker Compose.
   </Card>
   <Card title="Environment Variables" icon="key" href="/reference/env-vars">
-    See all Lambda environment variables.
+    See all environment variables for both deployment modes.
   </Card>
 </CardGroup>
