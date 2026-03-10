@@ -18,7 +18,6 @@ The wizard deploys the following infrastructure to your AWS account:
 | **API Gateway** | HTTPS endpoint that receives GitHub webhooks |
 | **WebhookHandler Lambda** | Node.js 20.x, ARM64, 256 MB memory, 30 s timeout |
 | **ReviewAgent Lambda** | Node.js 20.x, ARM64, 1024 MB memory, 300 s timeout |
-| **SQS FIFO Queue** | Ensures sequential review processing per pull request |
 | **DynamoDB Tables** | `mergewatch-installations` and `mergewatch-reviews` |
 | **SSM Parameters** | Encrypted credentials stored under `/mergewatch/{stage}/` |
 
@@ -121,7 +120,6 @@ The wizard runs `sam build` and `sam deploy` automatically. This takes 2-3 minut
 CloudFormation events:
   CREATE_COMPLETE    AWS::DynamoDB::Table       InstallationsTable
   CREATE_COMPLETE    AWS::DynamoDB::Table       ReviewsTable
-  CREATE_COMPLETE    AWS::SQS::Queue            ReviewQueue.fifo
   CREATE_COMPLETE    AWS::Lambda::Function      WebhookHandlerFunction
   CREATE_COMPLETE    AWS::Lambda::Function      ReviewAgentFunction
   CREATE_COMPLETE    AWS::ApiGateway::RestApi   WebhookApi
@@ -173,7 +171,6 @@ Checking MergeWatch (prod) in us-east-1...
   ✓ SSM parameters exist
   ✓ WebhookHandler Lambda is active
   ✓ ReviewAgent Lambda is active
-  ✓ SQS queue is reachable
   ✓ DynamoDB tables exist
   ✓ API Gateway endpoint responds (200 OK)
   ✓ GitHub App credentials are valid
@@ -206,8 +203,8 @@ Open a pull request against any installed repository. MergeWatch picks it up aut
 
 **What to expect:**
 
-- The `WebhookHandler` Lambda receives the `pull_request.opened` event and enqueues it to the SQS FIFO queue
-- The `ReviewAgent` Lambda picks up the message, fetches the diff from GitHub, and sends it to Amazon Bedrock
+- The `WebhookHandler` Lambda receives the `pull_request.opened` event and invokes the ReviewAgent Lambda asynchronously
+- The `ReviewAgent` Lambda fetches the diff from GitHub and sends it to Amazon Bedrock
 - A review comment appears on the pull request within **1-3 minutes**
 
 The review includes:

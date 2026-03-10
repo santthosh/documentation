@@ -12,7 +12,6 @@ sequenceDiagram
     participant GH as GitHub
     participant AG as API Gateway
     participant WH as WebhookHandler Lambda
-    participant SQS as SQS FIFO Queue
     participant RA as ReviewAgent Lambda
     participant BR as Amazon Bedrock
     participant DB as DynamoDB
@@ -20,8 +19,7 @@ sequenceDiagram
     GH->>AG: POST /webhook (pull_request event)
     AG->>WH: Invoke (256MB, 30s timeout)
     WH->>WH: Validate HMAC-SHA256 signature
-    WH->>SQS: Enqueue message (FIFO, per-PR group)
-    SQS->>RA: Trigger (1024MB, 300s timeout)
+    WH->>RA: Async invoke (InvocationType.Event)
     RA->>GH: Fetch PR diff via GitHub API
     par Parallel agent invocations
         RA->>BR: Security agent
@@ -46,11 +44,11 @@ sequenceDiagram
   <Step title="Webhook received">
     API Gateway receives the POST request and invokes the **WebhookHandler Lambda** (256 MB, 30 s timeout). The handler validates the payload against the webhook secret using HMAC-SHA256. Invalid signatures are rejected with a 401.
   </Step>
-  <Step title="Event queued">
-    The handler publishes a message to an **SQS FIFO queue**. The message group ID is `{owner}/{repo}#{pr_number}`, which guarantees sequential processing per PR — if a developer pushes twice in quick succession, reviews are processed in order, not in parallel.
+  <Step title="Async invocation">
+    The handler invokes the **ReviewAgent Lambda** asynchronously using `lambda:InvokeFunction` with `InvocationType.Event` (fire-and-forget). The call returns immediately with a 202 status. AWS Lambda's built-in async invocation queue handles delivery, with up to 2 automatic retries on failure.
   </Step>
   <Step title="ReviewAgent invoked">
-    SQS triggers the **ReviewAgent Lambda** (1024 MB, 300 s timeout). The agent fetches the PR diff from the GitHub API using the installation token, then fans out to five specialized agents.
+    The **ReviewAgent Lambda** (1024 MB, 300 s timeout) picks up the event from Lambda's internal async queue. The agent fetches the PR diff from the GitHub API using the installation token, then fans out to five specialized agents.
   </Step>
   <Step title="Multi-agent parallel review">
     Five agents run concurrently via `Promise.all()` — see [the pipeline](#the-multi-agent-pipeline) below. Each agent receives the diff and returns structured JSON findings.
@@ -137,20 +135,14 @@ MergeWatch v0.1 operates at **diff-only** awareness. The agents see the PR diff 
   <Card title="WebhookHandler Lambda">
     - **Memory:** 256 MB
     - **Timeout:** 30 seconds
-    - **Role:** Validate HMAC-SHA256 signature, parse event, enqueue to SQS
+    - **Role:** Validate HMAC-SHA256 signature, parse event, invoke ReviewAgent (async)
     - **Concurrency:** Unreserved (scales with API Gateway)
   </Card>
   <Card title="ReviewAgent Lambda">
     - **Memory:** 1024 MB
     - **Timeout:** 300 seconds (5 min)
     - **Role:** Fetch diff, invoke agents, run orchestrator, post results
-    - **Concurrency:** Limited by SQS batch size (1 per message group)
-  </Card>
-  <Card title="SQS FIFO Queue">
-    - **Message group ID:** `{owner}/{repo}#{pr_number}`
-    - **Deduplication:** Content-based
-    - **Visibility timeout:** 360 seconds (longer than Lambda timeout)
-    - **Purpose:** Guarantee sequential per-PR processing
+    - **Concurrency:** Triggered by async Lambda invoke (one invocation per event)
   </Card>
   <Card title="DynamoDB Tables">
     - **`installations`** — GitHub App installation config, repo settings
@@ -165,47 +157,69 @@ Where your data goes depends on which deployment model you choose. This matters 
 
 ### Self-hosted
 
-```
-Your AWS Account
-┌─────────────────────────────────────────────────┐
-│  API Gateway → WebhookHandler → SQS FIFO       │
-│       → ReviewAgent → Bedrock                   │
-│       → DynamoDB                                │
-│                                                 │
-│  GitHub API calls originate from YOUR Lambda.   │
-│  Bedrock calls go to YOUR account.              │
-│  Nothing touches MergeWatch infrastructure.     │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph your["Your AWS Account"]
+        direction LR
+        GH["GitHub"] -->|webhook| AG["API Gateway"]
+        AG --> WH["WebhookHandler"]
+        WH -->|async invoke| RA["ReviewAgent"]
+        RA -->|fetch diff| GH
+        RA --> BR["Bedrock"]
+        RA --> DB["DynamoDB"]
+        RA -->|post comments| GH
+    end
+
+    style your fill:#0d1117,stroke:#00ff88,color:#fff
 ```
 
 **Everything stays in your AWS account.** MergeWatch has zero access. You deploy the SAM template, you own the stack, you see every log in your CloudWatch. MergeWatch (the company) never sees your code, your diffs, your review results, or your Bedrock usage.
 
 ### BYOC (Bring Your Own Cloud)
 
-```
-MergeWatch Infra               Your AWS Account
-┌─────────────────┐           ┌──────────────────┐
-│  API Gateway     │           │                  │
-│  WebhookHandler  │           │  Bedrock         │
-│  SQS FIFO        │           │  (your models,   │
-│  ReviewAgent ────┼───────────▶  your bill)      │
-│  DynamoDB        │           │                  │
-└─────────────────┘           └──────────────────┘
+```mermaid
+flowchart LR
+    GH["GitHub"] -->|webhook| AG
+
+    subgraph mw["MergeWatch Infra"]
+        direction LR
+        AG["API Gateway"] --> WH["WebhookHandler"]
+        WH -->|async invoke| RA["ReviewAgent"]
+        RA --> DB["DynamoDB"]
+    end
+
+    subgraph yours["Your AWS Account"]
+        BR["Bedrock"]
+    end
+
+    RA -->|"sts:AssumeRole"| BR
+    RA -->|fetch diff| GH
+    RA -->|post comments| GH
+
+    style mw fill:#0d1117,stroke:#3b82f6,color:#fff
+    style yours fill:#0d1117,stroke:#00ff88,color:#fff
 ```
 
 The PR diff transits MergeWatch's Lambda during processing. The Bedrock invocation goes to **your** AWS account via a cross-account role. Review results are stored in MergeWatch's DynamoDB. Your code is processed in MergeWatch infrastructure but the LLM call happens in your account.
 
 ### SaaS
 
-```
-MergeWatch Infra
-┌─────────────────────────────────────────────────┐
-│  API Gateway → WebhookHandler → SQS FIFO       │
-│       → ReviewAgent → Bedrock (MergeWatch)      │
-│       → DynamoDB                                │
-│                                                 │
-│  Everything runs in MergeWatch's AWS account.   │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    GH["GitHub"] -->|webhook| AG
+
+    subgraph mw["MergeWatch Infra"]
+        direction LR
+        AG["API Gateway"] --> WH["WebhookHandler"]
+        WH -->|async invoke| RA["ReviewAgent"]
+        RA --> BR["Bedrock"]
+        RA --> DB["DynamoDB"]
+    end
+
+    RA -->|fetch diff| GH
+    RA -->|post comments| GH
+
+    style mw fill:#0d1117,stroke:#3b82f6,color:#fff
 ```
 
 Everything runs in MergeWatch's infrastructure. Your diff is processed by MergeWatch's Lambda and sent to MergeWatch's Bedrock. This is the fastest setup but offers the least data isolation.

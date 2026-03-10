@@ -34,9 +34,8 @@ The template creates the following AWS resources:
 | Resource | Type | Details |
 |---|---|---|
 | WebhookApi | `AWS::ApiGateway::RestApi` | REST API endpoint that receives GitHub webhook POST requests |
-| WebhookHandlerFunction | `AWS::Lambda::Function` | Node.js 20, ARM64, 256 MB, 30s timeout. Validates HMAC signature and enqueues events. |
+| WebhookHandlerFunction | `AWS::Lambda::Function` | Node.js 20, ARM64, 256 MB, 30s timeout. Validates HMAC signature and invokes ReviewAgent asynchronously. |
 | ReviewAgentFunction | `AWS::Lambda::Function` | Node.js 20, ARM64, 1024 MB, 300s timeout. Runs the multi-agent review pipeline. |
-| ReviewQueue.fifo | `AWS::SQS::Queue` | FIFO queue with content-based deduplication. Visibility timeout of 360s. |
 | InstallationsTable | `AWS::DynamoDB::Table` | On-demand table for GitHub App installation records. GSI on `accountId`. |
 | ReviewsTable | `AWS::DynamoDB::Table` | On-demand table for review history. 90-day TTL. GSI on `createdAt`. |
 | LambdaExecutionRole | `AWS::IAM::Role` | Shared execution role for both Lambda functions with least-privilege permissions. |
@@ -92,10 +91,10 @@ The Lambda execution role follows least-privilege principles. It includes the fo
     Scoped to `/mergewatch/{stage}/*`. Allows Lambda to decrypt and read GitHub App credentials at runtime.
   </Accordion>
 
-  <Accordion title="SQS">
-    `sqs:SendMessage`, `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes`
+  <Accordion title="Lambda Invoke">
+    `lambda:InvokeFunction`
 
-    Scoped to the ReviewQueue FIFO queue. WebhookHandler sends messages; ReviewAgent receives and deletes them.
+    Scoped to the ReviewAgent function ARN. WebhookHandler uses this to invoke ReviewAgent asynchronously (`InvocationType.Event`).
   </Accordion>
 </AccordionGroup>
 

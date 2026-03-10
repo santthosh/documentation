@@ -7,32 +7,14 @@ MergeWatch is an open-source GitHub App that reviews pull requests using a multi
 
 ## How it compares
 
-<CardGroup cols={3}>
-  <Card title="MergeWatch">
-    - Open source (AGPL v3)
-    - Runs in your AWS account
-    - No per-seat pricing
-    - Multi-agent parallel pipeline
-    - You control the models (Bedrock)
-    - Self-hosted or SaaS
-  </Card>
-  <Card title="Greptile">
-    - Closed source
-    - SaaS only — code sent to vendor
-    - Per-seat pricing
-    - Single-model pipeline
-    - Vendor-managed infrastructure
-    - No self-hosted option
-  </Card>
-  <Card title="CodeRabbit">
-    - Closed source
-    - SaaS only — code sent to vendor
-    - Per-seat pricing
-    - Single-pass review
-    - Vendor-managed infrastructure
-    - No self-hosted option
-  </Card>
-</CardGroup>
+| | **MergeWatch** | **Greptile** | **CodeRabbit** |
+|---|---|---|---|
+| **Source** | Open source (AGPL v3) | Closed source | Closed source |
+| **Hosting** | Self-hosted (SAM) or SaaS | Self-hosted available (Docker, any cloud) | Self-hosted available (Enterprise, 500-seat min, $15K+/mo) |
+| **Pricing** | No per-seat pricing — pay your Bedrock bill | $30/seat/month | $24/seat/month |
+| **Review approach** | Multi-agent parallel pipeline | Full-codebase graph + multi-hop analysis | Single-pass diff review |
+| **Model control** | You choose Bedrock models per agent | Bring-your-own-LLM (self-hosted) | Vendor-controlled (SaaS); configurable on self-hosted |
+| **Minimum commitment** | None | None stated | 500 seats for self-hosting |
 
 ## Key differentiators
 
@@ -58,7 +40,7 @@ Each agent is a separate Bedrock invocation running in parallel via `Promise.all
 </Note>
 
 ```
-PR opened → GitHub webhook → SQS FIFO → Lambda
+PR opened → GitHub webhook → WebhookHandler → ReviewAgent (async)
   ├── Security agent
   ├── Bug detection agent
   ├── Style agent
@@ -85,7 +67,6 @@ MergeWatch runs on a standard serverless stack:
 - **AWS Lambda** — review pipeline execution
 - **Amazon DynamoDB** — review state, repo config, user data
 - **API Gateway** — GitHub webhook receiver, dashboard API
-- **SQS FIFO** — queues PR events for ordered processing
 - **Amazon Bedrock** — Claude Sonnet, Haiku, Llama, Mistral (configurable)
 
 Configuration lives in a `.mergewatch.yml` file at the root of each repository. The [dashboard](/dashboard/overview) (Next.js) provides a UI for monitoring reviews, managing repos, and adjusting settings.
@@ -93,15 +74,13 @@ Configuration lives in a `.mergewatch.yml` file at the root of each repository. 
 <Accordion title="How is this different from CodeRabbit?">
   Both tools review PRs with AI. The differences are structural:
 
-  **Where your code goes.** CodeRabbit is SaaS-only. Your code is sent to their servers for processing. MergeWatch can run entirely in your AWS account — code never leaves your infrastructure.
+  **Where your code goes.** CodeRabbit's SaaS sends your code to their servers. Enterprise self-hosting exists but requires a 500-seat minimum at $15K+/month. MergeWatch self-hosts via a single SAM deploy with no seat minimum — code never leaves your AWS account.
 
-  **How you pay.** CodeRabbit charges per seat. MergeWatch has no per-seat fee. You pay your own Bedrock bill, which scales with usage, not team size.
+  **How you pay.** CodeRabbit charges $24/seat/month. MergeWatch has no per-seat fee. You pay your own Bedrock bill, which scales with usage, not team size.
 
-  **Review architecture.** CodeRabbit uses a single-pass review. MergeWatch runs five specialized agents in parallel and deduplicates their findings before posting. This tends to produce fewer duplicate comments and better coverage across security, correctness, and style.
+  **Source availability.** CodeRabbit is closed source. MergeWatch is AGPL v3 — you can read every line of the review logic, audit exactly what runs on your code, and contribute improvements.
 
-  **Source availability.** CodeRabbit is closed source. MergeWatch is AGPL v3. You can read every line of the review logic, audit it for your compliance needs, and contribute improvements.
-
-  **Model choice.** CodeRabbit decides which models to use. MergeWatch lets you configure which Bedrock models run for each agent. You can swap in newer models as they become available without waiting for a vendor update.
+  **Model choice.** On CodeRabbit SaaS, the vendor controls model selection. MergeWatch lets you configure which Bedrock models run for each agent, including swapping to newer Claude versions as they're released.
 </Accordion>
 
 ---

@@ -37,13 +37,13 @@ version: 1
 # Model used for all agents. Must be a valid Bedrock model ID.
 model: anthropic.claude-sonnet-4-20250514
 
-# Agent configuration — enable, disable, or customize each agent.
+# Agent configuration — enable, disable, or customize each built-in agent.
 agents:
   - name: security
     enabled: true
     prompt: "Flag OWASP Top 10 issues, hardcoded secrets, and unsafe deserialization."
 
-  - name: logic
+  - name: bugs
     enabled: true
     prompt: "Find logic bugs, off-by-one errors, and race conditions."
 
@@ -51,9 +51,8 @@ agents:
     enabled: true
     prompt: "Enforce project conventions. Be concise."
 
-  - name: tests
-    enabled: false
-    prompt: "Suggest missing unit tests for new public functions."
+  - name: summary
+    enabled: true
 
 # Review rules — control scope and trigger behavior.
 rules:
@@ -88,26 +87,31 @@ comment_style: inline
 
 ### Agents
 
-Each entry in the `agents` array configures one review agent. MergeWatch ships with four built-in agents.
+Each entry in the `agents` array configures one of the built-in review agents. You can enable, disable, or customize their prompts — but you cannot define new agent types. The pipeline is fixed to these five agents.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `name` | `string` | — | Agent identifier. Built-in agents: `security`, `logic` (also called `bugs`), `style`, `summary`. |
+| `name` | `string` | — | Agent identifier. Must be one of: `security`, `bugs`, `style`, `summary`, `diagram`. |
 | `enabled` | `boolean` | `true` | Set to `false` to disable the agent entirely. |
-| `prompt` | `string` | Built-in prompt | Custom system prompt for the agent. Overrides the default prompt. Use this to tailor the agent to your project's conventions. |
+| `prompt` | `string` | Built-in prompt | Custom system prompt for the agent. Overrides the default prompt. Use this to tailor the agent to your project's stack and conventions. |
+
+<Warning>
+Custom agent types are not supported. The `name` field must match one of the five built-in agents listed below. Unrecognized names are ignored.
+</Warning>
 
 <Tip>
 You do not need to list all agents. Omitted agents use their built-in defaults with `enabled: true`. To disable a single agent, include only that agent with `enabled: false`.
 </Tip>
 
-**Default agent states:**
+**Built-in agents:**
 
-| Agent | Default enabled | Purpose |
+| Agent | Default | Purpose |
 |---|---|---|
-| `security` | `true` | OWASP Top 10, secrets detection, injection flaws, unsafe deserialization |
-| `logic` / `bugs` | `true` | Logic errors, off-by-one, null dereferences, race conditions |
-| `style` | `true` | Code style, naming conventions, project-specific patterns |
-| `summary` | `true` | High-level PR summary with risk rating |
+| `security` | Enabled | OWASP Top 10, secrets detection, injection flaws, unsafe deserialization |
+| `bugs` | Enabled | Logic errors, off-by-one, null dereferences, race conditions |
+| `style` | Enabled | Code style, naming conventions, project-specific patterns |
+| `summary` | Enabled | High-level PR summary with risk rating (uses the light model) |
+| `diagram` | Enabled | Mermaid diagram of the changed control flow (uses the light model) |
 
 ### Rules
 
@@ -128,31 +132,80 @@ If the defaults work for you, the smallest valid configuration is:
 version: 1
 ```
 
-This enables all four agents with their default prompts, uses Claude Sonnet via Bedrock, and reviews PRs automatically.
+This enables all five agents with their default prompts, uses Claude Sonnet via Bedrock, and reviews PRs automatically.
 
 ## Common patterns
 
 <AccordionGroup>
 
-<Accordion title="Disable a single agent">
+<Accordion title="Security-focused pipeline (e.g., payments service)">
+```yaml .mergewatch.yml
+version: 1
+model: us.anthropic.claude-sonnet-4-20250514-v1:0
+agents:
+  - name: security
+    enabled: true
+    prompt: "This is a PCI-DSS scoped payments service. Focus on: SQL injection via raw queries, XSS in template rendering, hardcoded credentials, insecure cryptographic operations, and unvalidated redirects. Flag any use of eval() or exec()."
+  - name: bugs
+    enabled: true
+  - name: style
+    enabled: false
+  - name: diagram
+    enabled: false
+```
+Disables style and diagram agents. Security gets a detailed, domain-specific prompt while bugs runs with defaults.
+</Accordion>
+
+<Accordion title="Lightweight pipeline for high-volume repos">
+```yaml .mergewatch.yml
+version: 1
+model: us.anthropic.claude-haiku-4-5-20251001-v1:0
+max_tokens_per_agent: 2048
+max_findings: 10
+min_severity: warning
+agents:
+  - name: security
+    enabled: true
+  - name: bugs
+    enabled: false
+  - name: style
+    enabled: false
+  - name: diagram
+    enabled: false
+```
+Uses the cheaper Haiku model, runs only security + summary, and suppresses info-level findings. Good for repos with frequent small PRs where speed and cost matter more than comprehensive review.
+</Accordion>
+
+<Accordion title="Style-heavy pipeline for a frontend repo">
 ```yaml .mergewatch.yml
 version: 1
 agents:
   - name: style
-    enabled: false
+    enabled: true
+    prompt: "This is a React + TypeScript project. Flag any use of `any` type. Require explicit return types on exported functions. Flag inline styles — use Tailwind classes. Flag console.log() calls. Prefer named exports over default exports."
+  - name: security
+    enabled: true
+    prompt: "Focus on XSS via dangerouslySetInnerHTML, unsanitized user input in URLs, and exposed API keys in client-side code."
+  - name: bugs
+    enabled: true
 ```
-All other agents remain enabled with their defaults.
+Style agent gets detailed React/TypeScript conventions. Security is scoped to frontend-relevant issues.
 </Accordion>
 
-<Accordion title="Custom model with cost controls">
+<Accordion title="Monorepo with service boundaries">
 ```yaml .mergewatch.yml
 version: 1
-model: anthropic.claude-sonnet-4-20250514
-max_tokens_per_agent: 2048
-max_findings: 10
-min_severity: warning
+agents:
+  - name: bugs
+    enabled: true
+    prompt: "This repo contains three services: payments/, orders/, notifications/. Flag any direct imports across service boundaries — each service must be independent. Flag shared mutable state."
+  - name: security
+    enabled: true
+  - name: style
+    enabled: true
+    prompt: "Each service has its own tsconfig.json. Flag path aliases that reference other services."
 ```
-Reduces output tokens, limits findings, and suppresses informational-level comments.
+Customizes bugs and style agents to enforce architectural boundaries.
 </Accordion>
 
 <Accordion title="Review only on mention">
@@ -179,17 +232,18 @@ rules:
 ```
 </Accordion>
 
-<Accordion title="Custom agent prompts for a specific project">
+<Accordion title="Django/Python backend">
 ```yaml .mergewatch.yml
 version: 1
 agents:
   - name: security
-    enabled: true
-    prompt: "Focus on SQL injection and XSS. This is a Django project using raw queries in legacy modules."
+    prompt: "This is a Django 5 project. Focus on SQL injection via raw querysets, CSRF token issues, unvalidated redirects, and mass assignment via ModelForm. Check for DEBUG=True in settings."
   - name: style
-    enabled: true
-    prompt: "Enforce PEP 8. Flag any use of print() — use logging instead."
+    prompt: "Enforce PEP 8. Flag any print() calls — use logging instead. Flag bare except clauses. Require type hints on public function signatures."
+  - name: bugs
+    prompt: "Watch for N+1 query patterns in Django ORM, missing database migrations for model changes, and unclosed file handles."
 ```
+All three review agents get Django-specific prompts.
 </Accordion>
 
 </AccordionGroup>

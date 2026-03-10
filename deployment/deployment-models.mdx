@@ -28,7 +28,7 @@ MergeWatch supports three deployment models. Each one makes a different trade-of
 
 ### How it works
 
-MergeWatch runs the Lambda functions, DynamoDB tables, API Gateway, and SQS queue. When a review needs a model invocation, MergeWatch assumes a cross-account IAM role in your AWS account and calls Bedrock there.
+MergeWatch runs the Lambda functions, DynamoDB tables, and API Gateway. When a review needs a model invocation, MergeWatch assumes a cross-account IAM role in your AWS account and calls Bedrock there.
 
 ```
 PR opened → GitHub webhook → MergeWatch API Gateway → MergeWatch Lambda
@@ -83,8 +83,8 @@ The external ID is generated during onboarding and displayed in the MergeWatch d
 You run `npx mergewatch@latest init`, which deploys all resources to your AWS account. The GitHub App webhook points to your API Gateway. Every component runs in your environment.
 
 ```
-PR opened → GitHub webhook → Your API Gateway → Your Lambda
-  → Your SQS FIFO → Your ReviewAgent Lambda → Bedrock (your account)
+PR opened → GitHub webhook → Your API Gateway → Your WebhookHandler Lambda
+  → Invokes ReviewAgent Lambda (async) → Bedrock (your account)
   → Review posted to GitHub
 ```
 
@@ -95,7 +95,6 @@ PR opened → GitHub webhook → Your API Gateway → Your Lambda
 | **Lambda functions** | Deploying updates, monitoring, concurrency settings |
 | **DynamoDB tables** | Backups, capacity planning, TTL policies |
 | **API Gateway** | Custom domains, WAF rules, throttling |
-| **SQS FIFO queue** | Dead-letter queue monitoring, redrive policies |
 | **SSM parameters** | Credential rotation, KMS key management |
 | **Bedrock** | Model access requests, quotas, cost monitoring |
 
@@ -107,7 +106,7 @@ Updates are applied by re-running the SAM deploy. MergeWatch publishes new SAM t
 
 - **All data** stays in your AWS account, in the region you choose.
 - **No data** is sent to MergeWatch. There is no telemetry, no phone-home, no external dependency.
-- Suitable for air-gapped environments when combined with VPC endpoints for Bedrock, DynamoDB, SQS, and SSM.
+- Suitable for air-gapped environments when combined with VPC endpoints for Bedrock, DynamoDB, Lambda, and SSM.
 
 ---
 

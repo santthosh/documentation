@@ -9,9 +9,9 @@ MergeWatch subscribes to the following GitHub webhook events:
 
 | Event | Action | What MergeWatch does |
 |---|---|---|
-| `pull_request` | `opened` | Enqueues a full review |
-| `pull_request` | `synchronize` | Enqueues a re-review for the new commits |
-| `pull_request` | `reopened` | Enqueues a full review |
+| `pull_request` | `opened` | Triggers a full review |
+| `pull_request` | `synchronize` | Triggers a re-review for the new commits |
+| `pull_request` | `reopened` | Triggers a full review |
 | `issue_comment` | `created` | Checks for `@mergewatch` mention, triggers review or summary |
 | `installation` | `created` | Registers the installation in DynamoDB |
 | `installation` | `deleted` | Marks the installation as removed |

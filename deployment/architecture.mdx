@@ -1,18 +1,17 @@
 ---
 title: "Architecture Overview"
-description: "How MergeWatch components connect — Lambda functions, queues, databases, and model inference."
+description: "How MergeWatch components connect — Lambda functions, databases, and model inference."
 ---
 
-MergeWatch runs as a fully serverless pipeline on AWS. A GitHub webhook triggers a chain of Lambda functions, queues, and model invocations that ends with review comments posted back to the pull request.
+MergeWatch runs as a fully serverless pipeline on AWS. A GitHub webhook triggers a chain of Lambda functions and model invocations that ends with review comments posted back to the pull request.
 
 ## Component overview
 
 | Component | Type | Memory | Timeout | Role |
 |---|---|---|---|---|
-| WebhookHandler | Lambda (Node 20, ARM64) | 256 MB | 30s | Validate HMAC, enqueue to SQS |
+| WebhookHandler | Lambda (Node 20, ARM64) | 256 MB | 30s | Validate HMAC, invoke ReviewAgent (async) |
 | ReviewAgent | Lambda (Node 20, ARM64) | 1024 MB | 300s | Fetch diff, invoke agents, post results |
 | API Gateway | REST API | — | 29s | Receive webhook, proxy to Lambda |
-| SQS FIFO Queue | Queue | — | — | Sequential per-PR processing |
 | DynamoDB | On-demand tables | — | — | Installation config, review history |
 | SSM Parameter Store | SecureString | — | — | Encrypted credentials |
 
@@ -29,10 +28,7 @@ API Gateway (REST)
 WebhookHandler Lambda
   |  Validates HMAC-SHA256 signature
   |  Parses event type
-  v
-SQS FIFO Queue
-  |  MessageGroupId = "{owner}/{repo}#{pr_number}"
-  |  Guarantees sequential per-PR ordering
+  |  Invokes ReviewAgent (InvocationType.Event — async, fire-and-forget)
   v
 ReviewAgent Lambda
   |  Fetches diff via GitHub API (installation token)
@@ -93,14 +89,14 @@ DynamoDB
 ## Concurrency model
 
 <Note>
-SQS message group ID = `{owner}/{repo}#{pr_number}` — multiple PRs in the same repo process concurrently; multiple commits to the same PR process sequentially. This prevents a flood of pushes from creating overlapping reviews on the same PR.
+WebhookHandler invokes ReviewAgent asynchronously via the AWS Lambda Invoke API (`InvocationType.Event`). There is no queue between the two functions, so there is no built-in per-PR serialization.
 </Note>
 
 How it works in practice:
 
-- **PR #1 in `acme/api`** and **PR #2 in `acme/api`** have different message group IDs (`acme/api#1` vs `acme/api#2`), so they process in parallel.
-- **Two rapid pushes to PR #1** share the same message group ID (`acme/api#1`), so the second review waits for the first to complete.
-- If a new push arrives while a review is in progress, the in-flight review finishes and the queued message is processed next — no work is wasted.
+- **PR #1 in `acme/api`** and **PR #2 in `acme/api`** trigger independent ReviewAgent invocations that run in parallel.
+- **Two rapid pushes to PR #1** each trigger a separate ReviewAgent invocation. Both run concurrently — there is no queuing or ordering guarantee.
+- Each ReviewAgent invocation edits the same summary comment on the PR. If two invocations overlap, the last one to finish overwrites the summary (last write wins). Inline review comments are additive and are not affected by concurrency.
 
 ## Latency breakdown
 
@@ -108,9 +104,8 @@ Typical end-to-end timing from webhook receipt to comments appearing on the PR:
 
 | Step | Duration |
 |---|---|
-| GitHub → API Gateway | <100ms |
+| GitHub → API Gateway | &lt;100ms |
 | WebhookHandler Lambda | 200–500ms |
-| SQS polling | 0–5s |
 | ReviewAgent startup (cold) | 5–10s |
 | GitHub diff fetch | 200–800ms |
 | 5x parallel Bedrock calls | 8–20s |
