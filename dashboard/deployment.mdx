@@ -1,0 +1,286 @@
+---
+title: "Dashboard Deployment"
+description: "Deploy the MergeWatch dashboard to AWS Amplify — Git-native deploys, GitHub OAuth, and zero server management."
+---
+
+The MergeWatch dashboard is a Next.js application deployed separately from the SAM-managed backend. It connects to your Lambda backend via API Gateway and authenticates users with GitHub OAuth.
+
+<Frame caption="The MergeWatch landing page at mergewatch.ai.">
+  <img src="/images/landing.png" alt="MergeWatch landing page" />
+</Frame>
+
+## Architecture split
+
+MergeWatch has two independently deployed components:
+
+| Component | Technology | Deploy method |
+|---|---|---|
+| **Backend** (webhook handler, review agents) | AWS Lambda + API Gateway | SAM / `sam deploy` |
+| **Dashboard** (frontend UI) | Next.js on AWS Amplify | Amplify Console / Git push |
+
+The dashboard is a read/write frontend that talks to your Lambda backend's REST API. It authenticates users via **GitHub OAuth** and scopes all data to the GitHub App installation.
+
+## Why Amplify
+
+- **Zero server management** — Amplify handles builds, CDN, and SSL automatically
+- **Git-native deploys** — push to `main`, Amplify builds and deploys
+- **Environment variable management** — secrets stored in Amplify Console, injected at build time
+- **Same AWS account** — keeps the entire stack in your AWS account boundary
+- **Custom domain** — one-click custom domain with ACM certificate provisioning
+
+## Prerequisites
+
+Before deploying the dashboard, you must have:
+
+- Completed the backend deployment via `npx mergewatch@latest init`
+- Your API Gateway URL from the SAM stack output
+- Your GitHub App credentials (App ID, Client ID, Client Secret)
+- An AWS account with Amplify access
+- A GitHub repository containing the MergeWatch source
+
+## Environment variables
+
+Configure these in the Amplify Console under **App settings > Environment variables**.
+
+<Warning>
+Never commit environment variables to your repository. Always set them in the Amplify Console. Variables prefixed with `NEXT_PUBLIC_` are embedded in the client bundle and visible to users — do not use this prefix for secrets.
+</Warning>
+
+### Required — GitHub OAuth
+
+| Variable | Description | Where to find it |
+|---|---|---|
+| `GITHUB_ID` | GitHub App's OAuth Client ID | GitHub App settings > Client ID |
+| `GITHUB_SECRET` | GitHub App's OAuth Client Secret | GitHub App settings > Client Secrets |
+| `NEXTAUTH_SECRET` | Random secret for NextAuth session signing | Generate: `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Full URL of your deployed dashboard | Your Amplify app URL, e.g. `https://main.abc123.amplifyapp.com` |
+
+### Required — Backend connection
+
+| Variable | Description | Where to find it |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | API Gateway base URL from SAM stack | SAM stack output: `ApiGatewayUrl` |
+| `GITHUB_APP_ID` | GitHub App ID | GitHub App settings |
+| `GITHUB_APP_SLUG` | GitHub App slug (used to build install URLs) | GitHub App settings |
+
+### Optional — Feature flags
+
+| Variable | Description | Default |
+|---|---|---|
+| `NEXT_PUBLIC_ENABLE_BILLING` | Show billing/usage UI | `false` |
+| `NODE_ENV` | Runtime environment | `production` (set automatically by Amplify) |
+
+## Deployment steps
+
+<Steps>
+
+<Step title="Connect your repository to Amplify">
+
+1. Open the [AWS Amplify Console](https://console.aws.amazon.com/amplify/home)
+2. Click **Create new app > Host web app**
+3. Select **GitHub** as your source provider
+4. Authorize Amplify to access your GitHub account
+5. Select the `mergewatch` repository and the `main` branch
+6. Click **Next**
+
+</Step>
+
+<Step title="Configure build settings">
+
+Amplify auto-detects Next.js. Confirm the build spec:
+
+```yaml amplify.yml
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+```
+
+</Step>
+
+<Step title="Set environment variables">
+
+Before deploying, add all required environment variables under **Advanced settings > Environment variables** during setup, or navigate to:
+
+**Amplify Console > Your app > App settings > Environment variables**
+
+Add each variable from the tables above and click **Save**.
+
+</Step>
+
+<Step title="Deploy">
+
+Click **Save and deploy**. Amplify will:
+
+1. Clone your repository
+2. Install dependencies (`npm ci`)
+3. Run the Next.js build (`npm run build`)
+4. Deploy to Amplify's CDN
+5. Provision an SSL certificate
+
+First deploy takes approximately 3–5 minutes. Subsequent deploys triggered by `git push` typically take 2–3 minutes.
+
+</Step>
+
+<Step title="Set NEXTAUTH_URL">
+
+Once deployed, copy your Amplify app URL (e.g. `https://main.abc123.amplifyapp.com`) and update the `NEXTAUTH_URL` environment variable to this value. Trigger a redeploy.
+
+<Tip>
+You must also add this URL to your GitHub App's **Callback URLs** in GitHub App settings (Settings > Developer settings > GitHub Apps > your app > General > Callback URL).
+</Tip>
+
+</Step>
+
+<Step title="(Optional) Set a custom domain">
+
+In **App settings > Domain management**, add your custom domain (e.g. `app.mergewatch.ai`). Amplify provisions an ACM certificate automatically. DNS propagation takes 10–30 minutes.
+
+</Step>
+
+</Steps>
+
+## GitHub authentication
+
+<Frame caption="The sign-in page uses GitHub OAuth — no code access is required.">
+  <img src="/images/signin.png" alt="MergeWatch sign-in page" />
+</Frame>
+
+The dashboard uses **NextAuth.js with the GitHub provider**. The same GitHub App that handles webhooks also authenticates users — there is no separate OAuth app.
+
+```
+User clicks "Sign in with GitHub"
+         │
+         v
+NextAuth redirects to GitHub OAuth
+(using your GitHub App's client_id)
+         │
+         v
+User authorizes → GitHub redirects back with code
+         │
+         v
+NextAuth exchanges code for access token
+         │
+         v
+Dashboard calls GitHub API:
+  GET /user/installations
+  → Returns all GitHub App installations the user has access to
+         │
+         v
+Dashboard scopes all data to installation_id
+```
+
+### GitHub scopes requested
+
+MergeWatch requests the **minimum scopes** needed:
+
+| Scope | Why |
+|---|---|
+| `read:user` | Get authenticated user's profile and username |
+| `user:email` | Display user identity in the dashboard header |
+
+The GitHub App installation permissions (not OAuth scopes) handle repository access — the OAuth login is purely for identity, not code access.
+
+### Organization support
+
+- **Org installation** — when a GitHub App is installed on an org, any org member with admin rights can access the dashboard for that installation
+- **Access check** — the dashboard calls `GET /orgs/{org}/members/{username}` with `role=admin` to verify the user is an org admin before showing settings controls
+- **Multiple installations** — a single user can have multiple installations (personal + multiple orgs). The dashboard shows all installations and lets them switch between them
+- **No separate org concept** — GitHub's own org membership model is the source of truth for access control
+
+### Session model
+
+Sessions are stored as **encrypted JWT cookies** (default NextAuth behavior). No session database is needed. The JWT contains:
+
+- GitHub user ID and username
+- OAuth access token (for GitHub API calls from the frontend)
+- Installation IDs the user has access to
+
+Session expiry defaults to 30 days.
+
+## Connecting dashboard to backend
+
+The dashboard calls your Lambda backend via API Gateway. All API calls are authenticated using the user's GitHub session — the backend validates the GitHub token on each request.
+
+```
+Dashboard (Amplify) → API Gateway → Lambda
+
+Request:
+  GET /api/reviews?installation_id=123
+  Authorization: Bearer {github_oauth_token}
+
+Lambda validates:
+  GET https://api.github.com/user
+  → Confirms token is valid and belongs to a user
+    with access to installation_id 123
+```
+
+Set `NEXT_PUBLIC_API_URL` to your API Gateway URL from the SAM stack output. The dashboard appends paths like `/reviews`, `/repositories`, `/settings` to this base URL.
+
+## Re-deploying after backend changes
+
+If your API Gateway URL changes (e.g., after recreating the SAM stack), update `NEXT_PUBLIC_API_URL` in Amplify Console and trigger a new build. Backend-only changes (Lambda code, DynamoDB schema) do not require a dashboard redeploy.
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Build fails with 'Module not found'">
+Run `npm ci` locally and confirm the build passes before pushing. Check that `package-lock.json` is committed.
+</Accordion>
+
+<Accordion title="Sign-in fails with 'Configuration' error">
+The `NEXTAUTH_SECRET` or `NEXTAUTH_URL` environment variables are missing or incorrect. Confirm `NEXTAUTH_URL` exactly matches your Amplify URL (no trailing slash).
+</Accordion>
+
+<Accordion title="Blank dashboard after sign-in">
+`NEXT_PUBLIC_API_URL` is missing or pointing to the wrong API Gateway URL. Check the SAM stack output for the correct URL.
+</Accordion>
+
+<Accordion title="GitHub returns 'redirect_uri_mismatch'">
+Add your Amplify URL to your GitHub App's **Callback URLs** in GitHub App settings (Settings > Developer settings > GitHub Apps > your app > General > Callback URL).
+</Accordion>
+
+<Accordion title="User sees wrong installation data">
+Confirm the `GITHUB_APP_ID` and `GITHUB_APP_SLUG` match your deployed GitHub App. Mismatches cause installation lookups to return empty results.
+</Accordion>
+
+</AccordionGroup>
+
+## Summary
+
+| | Value |
+|---|---|
+| **Platform** | AWS Amplify (Next.js SSR) |
+| **Deploy trigger** | Git push to `main` |
+| **Auth** | NextAuth.js + GitHub OAuth (GitHub App) |
+| **Session storage** | Encrypted JWT cookie |
+| **API connection** | `NEXT_PUBLIC_API_URL` → API Gateway |
+| **Access control** | GitHub App installation_id + org membership API |
+| **Custom domain** | Supported via Amplify Domain Management |
+
+---
+
+<CardGroup cols={2}>
+
+<Card title="Dashboard Overview" icon="gauge" href="/dashboard/overview">
+  Learn about the dashboard pages and access control model.
+</Card>
+
+<Card title="Self-Hosting Install" icon="terminal" href="/self-hosting/install">
+  Deploy the backend stack that the dashboard connects to.
+</Card>
+
+</CardGroup>

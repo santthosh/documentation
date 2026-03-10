@@ -5,9 +5,17 @@ description: "Monitor reviews, manage repositories, and configure MergeWatch fro
 
 The MergeWatch dashboard is a Next.js application that provides review history, repository management, and configuration. For self-hosted deployments, it deploys alongside the SAM stack. SaaS users access it at [mergewatch.ai](https://mergewatch.ai).
 
+<Frame caption="MergeWatch dashboard — home page with monitored repositories and recent reviews.">
+  <img src="/images/dashboard.png" alt="MergeWatch dashboard" />
+</Frame>
+
 ## Authentication
 
 MergeWatch uses GitHub OAuth via NextAuth.js. Click **Sign in with GitHub** on the login page. MergeWatch requests read access to your GitHub profile and organization membership — it does not request any repository access beyond what the GitHub App already has.
+
+<Frame caption="Sign in with your GitHub account — no code access is required.">
+  <img src="/images/signin.png" alt="MergeWatch sign-in page" />
+</Frame>
 
 ## Dashboard pages
 

@@ -82,6 +82,7 @@
             "group": "Dashboard",
             "pages": [
               "dashboard/overview",
+              "dashboard/deployment",
               "dashboard/reviews",
               "dashboard/repositories",
               "dashboard/settings",
