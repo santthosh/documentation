@@ -1,10 +1,126 @@
 ---
 title: "Review Behavior"
-description: "How and when MergeWatch reviews your pull requests"
+description: "When reviews trigger, what they produce, and how to control the review lifecycle."
 ---
 
+MergeWatch listens to GitHub webhook events and automatically reviews pull requests based on a set of configurable rules. This page explains exactly when reviews run, what statuses they produce, and how to control the lifecycle.
+
+## When reviews trigger
+
+MergeWatch triggers a review when it receives any of the following GitHub webhook events:
+
+<Steps>
+<Step title="pull_request.opened">
+  A new pull request is opened against the repository. MergeWatch fetches the diff and starts a review immediately.
+</Step>
+<Step title="pull_request.synchronize">
+  New commits are pushed to an existing pull request. MergeWatch re-reviews the updated diff and replaces the previous summary comment.
+</Step>
+<Step title="pull_request.reopened">
+  A previously closed pull request is reopened. MergeWatch treats this the same as a new PR and runs a fresh review.
+</Step>
+<Step title="issue_comment.created (manual re-trigger)">
+  A comment is posted on a pull request containing `@mergewatch review`. This works even when `auto_review` is set to `false` in your configuration.
+</Step>
+</Steps>
+
+<Warning>
+## When reviews do NOT trigger
+
+MergeWatch deliberately skips reviews in the following situations:
+
+- **Draft PRs** — Skipped by default. Set `rules.skip_drafts: false` in your `.mergewatch.yml` to review drafts.
+- **All changed files match `ignore_patterns`** — If every file in the PR matches a pattern in `rules.ignore_patterns`, the entire PR is skipped.
+- **PR exceeds `rules.max_files` limit** — PRs with more changed files than the configured `max_files` value (default: 50) are skipped with a comment explaining why.
+- **Repository is paused** — If MergeWatch is paused for the repository in the [dashboard](/dashboard/settings), no reviews run until it is resumed.
+</Warning>
+
+## Review status values
+
+Every review tracked by MergeWatch has one of the following statuses, visible in the [dashboard Reviews table](/dashboard/reviews):
+
+| Status | Meaning |
+|---|---|
+| **Reviewing...** | The ReviewAgent Lambda is currently running. The review is in progress. |
+| **Reviewed** | The review completed successfully and findings have been posted to GitHub. |
+| **Skipped** | The PR matched a skip rule. The reason is logged and visible in the detail drawer. |
+| **Failed** | A Lambda error or Bedrock failure occurred. The review can be re-triggered. |
+
+<Tip>
+Failed reviews can always be retried by commenting `@mergewatch review` on the pull request.
+</Tip>
+
+## Comment editing behavior
+
+MergeWatch manages comments on your pull requests as follows:
+
+- **Summary comment** — MergeWatch creates **one summary comment per PR** and edits it in place on every subsequent re-review. This keeps the conversation clean and avoids flooding the PR with duplicate summaries.
+- **Inline findings** — Individual findings are posted as fresh review comments on the relevant lines of code. Each re-review posts a new set of inline comments.
+- **Old inline comments are not deleted** — Due to a GitHub API limitation, MergeWatch cannot delete previously posted inline comments. They remain on the PR but are superseded by the latest review.
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+If you see outdated inline comments after a re-review, check the timestamp. The most recent review's summary comment always reflects the current state.
 </Note>
+
+## Re-triggering a review
+
+To manually re-trigger a review, post a comment on the pull request:
+
+```
+@mergewatch review
+```
+
+This works in all scenarios:
+
+- Even when `auto_review: false` is set in your configuration
+- After a failed review to retry
+- After pushing new commits, if you do not want to wait for the automatic trigger
+- On PRs that were previously skipped (the skip rules are re-evaluated)
+
+When a re-triggered review completes, it **replaces the previous summary comment** with the new results. Inline findings are posted fresh alongside any existing comments.
+
+## Confidence scores
+
+Each finding produced by MergeWatch includes a **confidence score** from 1 to 100, indicating how certain the agent is about the issue.
+
+| Range | Interpretation |
+|---|---|
+| 80-100 | High confidence — very likely a real issue |
+| 50-79 | Medium confidence — worth reviewing |
+| 1-49 | Low confidence — may be a false positive |
+
+By default, findings with confidence below **50** are suppressed. You can control this threshold with the `min_confidence` setting:
+
+```yaml .mergewatch.yml
+version: 1
+min_confidence: 50   # default — suppresses low-confidence findings
+```
+
+<AccordionGroup>
+<Accordion title="See all findings, including low-confidence">
+```yaml .mergewatch.yml
+version: 1
+min_confidence: 0
+```
+Set `min_confidence: 0` to see every finding regardless of confidence. Useful for auditing or tuning custom instructions.
+</Accordion>
+
+<Accordion title="Only show high-confidence findings">
+```yaml .mergewatch.yml
+version: 1
+min_confidence: 80
+```
+Reduces noise by only surfacing findings the agents are highly confident about.
+</Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Skip Rules" icon="forward" href="/configuration/skip-rules">
+    Learn how to control which PRs are skipped and why.
+  </Card>
+  <Card title="Custom Instructions" icon="pencil" href="/configuration/custom-instructions">
+    Tailor review focus with project-specific guidance injected into agent prompts.
+  </Card>
+</CardGroup>

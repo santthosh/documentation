@@ -1,10 +1,110 @@
 ---
 title: "Manual Install"
-description: "Deploy MergeWatch without the CLI wizard"
+description: "Deploy MergeWatch without the CLI wizard — step-by-step SAM and GitHub App setup."
 ---
 
+## When to use manual install
+
+Use this guide if you:
+
+- Cannot run `npx` (air-gapped environment, corporate policy restrictions)
+- Want full control over each individual step
+- Need to customize the deployment beyond what the wizard supports
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+The CLI wizard automates all of these steps. See [Quick-start install](/self-hosting/install) for the recommended path.
 </Note>
+
+---
+
+## Deployment steps
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/santthosh/mergewatch.ai.git
+    cd mergewatch.ai
+    npm install
+    ```
+  </Step>
+
+  <Step title="Create a GitHub App">
+    Go to [https://github.com/settings/apps/new](https://github.com/settings/apps/new) and create a new GitHub App with the [required permissions](/github-app/permissions).
+
+    - Set the **Webhook URL** to a placeholder (you will update this after deployment)
+    - Generate a **webhook secret** and save it
+    - Generate a **private key** and download the `.pem` file
+    - Note the **App ID** from the app settings page
+  </Step>
+
+  <Step title="Store credentials in SSM">
+    ```bash
+    aws ssm put-parameter \
+      --name "/mergewatch/prod/github-app-id" \
+      --type SecureString \
+      --value "YOUR_APP_ID"
+
+    aws ssm put-parameter \
+      --name "/mergewatch/prod/github-private-key" \
+      --type SecureString \
+      --value "$(cat private-key.pem)"
+
+    aws ssm put-parameter \
+      --name "/mergewatch/prod/github-webhook-secret" \
+      --type SecureString \
+      --value "YOUR_WEBHOOK_SECRET"
+    ```
+
+    <Warning>
+    Replace `YOUR_APP_ID` and `YOUR_WEBHOOK_SECRET` with the actual values from the previous step. Ensure `private-key.pem` is in your current directory.
+    </Warning>
+  </Step>
+
+  <Step title="Build and deploy">
+    ```bash
+    sam build
+    sam deploy --guided
+    ```
+
+    The `--guided` flag walks you through the CloudFormation parameter configuration. Accept the defaults or customize as needed.
+  </Step>
+
+  <Step title="Update the GitHub App webhook URL">
+    Copy the **WebhookUrl** from the SAM deploy output:
+
+    ```
+    CloudFormation outputs from deployed stack
+    -----------------------------------------------
+    Key                 WebhookUrl
+    Description         Webhook endpoint for GitHub
+    Value               https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/webhook
+    ```
+
+    Go to your GitHub App settings and update the **Webhook URL** to this value.
+  </Step>
+
+  <Step title="Install the GitHub App">
+    Navigate to your GitHub App's public page and install it on the repositories you want MergeWatch to review.
+  </Step>
+
+  <Step title="Run a health check">
+    ```bash
+    npx mergewatch@latest health --stage prod
+    ```
+
+    Verify that all components report healthy status.
+  </Step>
+</Steps>
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick-start Install" icon="bolt" href="/self-hosting/install">
+    Use the CLI wizard for an automated setup.
+  </Card>
+  <Card title="SAM Template" icon="layer-group" href="/deployment/sam-template">
+    Understand the infrastructure defined in the SAM template.
+  </Card>
+</CardGroup>

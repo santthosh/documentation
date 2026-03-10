@@ -1,10 +1,135 @@
 ---
 title: "Architecture Overview"
-description: "MergeWatch infrastructure and component architecture"
+description: "How MergeWatch components connect — Lambda functions, queues, databases, and model inference."
 ---
 
+MergeWatch runs as a fully serverless pipeline on AWS. A GitHub webhook triggers a chain of Lambda functions, queues, and model invocations that ends with review comments posted back to the pull request.
+
+## Component overview
+
+| Component | Type | Memory | Timeout | Role |
+|---|---|---|---|---|
+| WebhookHandler | Lambda (Node 20, ARM64) | 256 MB | 30s | Validate HMAC, enqueue to SQS |
+| ReviewAgent | Lambda (Node 20, ARM64) | 1024 MB | 300s | Fetch diff, invoke agents, post results |
+| API Gateway | REST API | — | 29s | Receive webhook, proxy to Lambda |
+| SQS FIFO Queue | Queue | — | — | Sequential per-PR processing |
+| DynamoDB | On-demand tables | — | — | Installation config, review history |
+| SSM Parameter Store | SecureString | — | — | Encrypted credentials |
+
+## Architecture diagram
+
+```
+GitHub
+  |
+  | pull_request webhook (HMAC-signed)
+  v
+API Gateway (REST)
+  |
+  v
+WebhookHandler Lambda
+  |  Validates HMAC-SHA256 signature
+  |  Parses event type
+  v
+SQS FIFO Queue
+  |  MessageGroupId = "{owner}/{repo}#{pr_number}"
+  |  Guarantees sequential per-PR ordering
+  v
+ReviewAgent Lambda
+  |  Fetches diff via GitHub API (installation token)
+  |  Fans out to agents via Promise.all()
+  |
+  +-- Security agent ------+
+  +-- Logic agent ---------+---> Bedrock (parallel)
+  +-- Style agent ---------+
+  +-- Summary agent -------+
+  |
+  v
+Orchestrator agent
+  |  Deduplicates findings
+  |  Ranks by severity + confidence
+  |  Computes merge readiness score
+  v
+GitHub API
+  |  Posts Check Run
+  |  Posts inline review comments
+  v
+DynamoDB
+  |  Writes review record (90-day TTL)
+```
+
+## DynamoDB tables
+
+<AccordionGroup>
+  <Accordion title="mergewatch-installations">
+    **Primary key:** `installationId` (partition key)
+
+    **GSI:** `accountId-index` on `accountId`
+
+    Stores GitHub App installation records and per-repo settings. Each item represents one GitHub App installation and includes:
+    - GitHub account/org information
+    - List of enabled repositories
+    - Per-repo configuration overrides (model, skip rules, custom instructions)
+    - Installation status and timestamps
+
+    This table uses on-demand billing and has no TTL — installation records persist until the app is uninstalled.
+  </Accordion>
+
+  <Accordion title="mergewatch-reviews">
+    **Primary key:** `installationId#repoFullName` (partition key), `reviewId` (sort key)
+
+    **GSI:** `createdAt-index` on `createdAt`
+
+    **TTL:** 90 days (automatically expires old review records)
+
+    Stores all review records including:
+    - Raw agent findings (security, logic, style, summary)
+    - Orchestrator output (deduplicated findings, severity rankings)
+    - Merge readiness score
+    - Timing data (per-agent latency, total duration)
+    - GitHub metadata (PR number, commit SHA, check run ID)
+  </Accordion>
+</AccordionGroup>
+
+## Concurrency model
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+SQS message group ID = `{owner}/{repo}#{pr_number}` — multiple PRs in the same repo process concurrently; multiple commits to the same PR process sequentially. This prevents a flood of pushes from creating overlapping reviews on the same PR.
 </Note>
+
+How it works in practice:
+
+- **PR #1 in `acme/api`** and **PR #2 in `acme/api`** have different message group IDs (`acme/api#1` vs `acme/api#2`), so they process in parallel.
+- **Two rapid pushes to PR #1** share the same message group ID (`acme/api#1`), so the second review waits for the first to complete.
+- If a new push arrives while a review is in progress, the in-flight review finishes and the queued message is processed next — no work is wasted.
+
+## Latency breakdown
+
+Typical end-to-end timing from webhook receipt to comments appearing on the PR:
+
+| Step | Duration |
+|---|---|
+| GitHub → API Gateway | <100ms |
+| WebhookHandler Lambda | 200–500ms |
+| SQS polling | 0–5s |
+| ReviewAgent startup (cold) | 5–10s |
+| GitHub diff fetch | 200–800ms |
+| 5x parallel Bedrock calls | 8–20s |
+| Orchestrator | 3–8s |
+| GitHub comment posting | 200–500ms |
+| **Total (warm)** | **~15–35s** |
+| **Total (cold start)** | **~25–50s** |
+
+<Tip>
+Cold starts only affect the first invocation after a period of inactivity. Once the Lambda is warm, subsequent reviews skip the 5–10s startup penalty. Under steady load, most reviews complete in under 30 seconds.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment Models" icon="cloud" href="/deployment/deployment-models">
+    Understand the differences between self-hosted, BYOC, and SaaS deployments.
+  </Card>
+  <Card title="SAM Template Reference" icon="file-code" href="/deployment/sam-template">
+    Explore the full SAM template parameters, resources, and outputs.
+  </Card>
+</CardGroup>

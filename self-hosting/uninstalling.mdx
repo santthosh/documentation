@@ -1,10 +1,81 @@
 ---
 title: "Uninstalling"
-description: "Remove MergeWatch from your AWS account and GitHub"
+description: "Remove MergeWatch from your AWS account and GitHub organization."
 ---
 
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+Uninstalling the GitHub App (Step 1) is sufficient to stop all reviews immediately. The AWS cleanup steps are optional but recommended to avoid residual costs.
 </Note>
+
+## Full removal process
+
+<Steps>
+  <Step title="Uninstall the GitHub App">
+    1. Go to **GitHub Settings > Applications**
+    2. Find **MergeWatch** and click **Configure**
+    3. Click **Uninstall**
+
+    This stops all webhook delivery immediately. No new reviews will be triggered.
+  </Step>
+
+  <Step title="Delete the CloudFormation stack">
+    ```bash
+    aws cloudformation delete-stack --stack-name mergewatch-prod
+    ```
+
+    This removes:
+    - API Gateway
+    - Lambda functions
+    - SQS queue
+    - IAM roles
+
+    Wait for the stack deletion to complete:
+
+    ```bash
+    aws cloudformation wait stack-delete-complete --stack-name mergewatch-prod
+    ```
+  </Step>
+
+  <Step title="Delete DynamoDB tables (if retained)">
+    If the tables have a `DeletionPolicy: Retain` (the default), they are not removed with the stack. Delete them manually:
+
+    ```bash
+    aws dynamodb delete-table --table-name mergewatch-installations-prod
+    aws dynamodb delete-table --table-name mergewatch-reviews-prod
+    ```
+
+    <Warning>
+    This permanently deletes all review history. This action cannot be undone.
+    </Warning>
+  </Step>
+
+  <Step title="Delete SSM parameters">
+    ```bash
+    aws ssm delete-parameter --name "/mergewatch/prod/github-app-id"
+    aws ssm delete-parameter --name "/mergewatch/prod/github-private-key"
+    aws ssm delete-parameter --name "/mergewatch/prod/github-webhook-secret"
+    ```
+  </Step>
+
+  <Step title="Delete the GitHub App (optional)">
+    If you no longer need the GitHub App at all:
+
+    1. Go to **GitHub Settings > Developer settings > GitHub Apps**
+    2. Find **MergeWatch**
+    3. Click **Edit** then **Delete GitHub App**
+
+    <Tip>
+    You can skip this step if you plan to re-install MergeWatch later. The app registration has no cost.
+    </Tip>
+  </Step>
+</Steps>
+
+---
+
+## Next steps
+
+<CardGroup cols={1}>
+  <Card title="Re-install MergeWatch" icon="rotate-right" href="/self-hosting/install">
+    Changed your mind? Set up MergeWatch again in under five minutes.
+  </Card>
+</CardGroup>

@@ -1,10 +1,161 @@
 ---
 title: "CLI Reference"
-description: "MergeWatch CLI commands and options"
+description: "Every command, flag, and option for the MergeWatch CLI."
 ---
 
+```bash
+npx mergewatch@latest <command>
+```
+
+## Commands
+
+| Command   | Description                                             |
+| --------- | ------------------------------------------------------- |
+| `init`    | Run the setup wizard (create GitHub App, deploy to AWS) |
+| `upgrade` | Upgrade to latest version                               |
+| `health`  | Check stack health                                      |
+| `logs`    | Tail CloudWatch Lambda logs                             |
+| `check`   | Verify all prerequisites                                |
+| `version` | Show installed version                                  |
+
+---
+
+## init
+
+Run the interactive setup wizard. This creates a GitHub App via manifest flow, stores credentials in SSM, and deploys the full stack with SAM.
+
+```bash
+npx mergewatch@latest init
+```
+
+### Flags
+
+| Flag                | Description                | Default     |
+| ------------------- | -------------------------- | ----------- |
+| `--stage <name>`    | Stack stage name           | `prod`      |
+| `--region <region>` | AWS region                 | `us-east-1` |
+| `--profile <name>`  | AWS CLI profile to use     | —           |
+| `--yes`             | Skip confirmation prompts  | `false`     |
+
+<Tip>
+Use `--yes` in CI/CD pipelines to skip all interactive prompts. Make sure all prerequisites pass `check` first.
+</Tip>
+
+---
+
+## upgrade
+
+Pulls the latest SAM template, runs `sam deploy` with your existing `samconfig.toml`, and runs a health check.
+
+```bash
+npx mergewatch@latest upgrade
+```
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+The upgrade command preserves your existing configuration. It reads `samconfig.toml` from your project root and applies only infrastructure changes.
 </Note>
+
+---
+
+## health
+
+Check the health of your deployed MergeWatch stack.
+
+```bash
+npx mergewatch@latest health
+```
+
+### Flags
+
+| Flag                | Description                    | Default |
+| ------------------- | ------------------------------ | ------- |
+| `--stage <name>`    | Stage to check                 | `prod`  |
+| `--region <region>` | AWS region                     | —       |
+| `--json`            | Output as JSON (for scripting) | `false` |
+
+<CodeGroup>
+```bash Human-readable output
+npx mergewatch@latest health --stage prod
+```
+
+```bash JSON output
+npx mergewatch@latest health --stage prod --json
+```
+</CodeGroup>
+
+---
+
+## logs
+
+Tail CloudWatch Lambda logs in real time.
+
+```bash
+npx mergewatch@latest logs
+```
+
+### Flags
+
+| Flag                | Description                     | Default |
+| ------------------- | ------------------------------- | ------- |
+| `--stage <name>`    | Stage                           | `prod`  |
+| `--region <region>` | AWS region                      | —       |
+| `--function <name>` | `webhook` or `agent`            | `agent` |
+| `--since <time>`    | e.g., `5m`, `1h`, `2024-01-01` | —       |
+| `--filter <str>`    | CloudWatch filter pattern       | —       |
+
+<CodeGroup>
+```bash Tail agent logs
+npx mergewatch@latest logs --function agent --since 5m
+```
+
+```bash Filter for errors
+npx mergewatch@latest logs --filter "ERROR" --since 1h
+```
+
+```bash Webhook logs
+npx mergewatch@latest logs --function webhook --since 30m
+```
+</CodeGroup>
+
+---
+
+## check
+
+Verifies that all prerequisites are installed and configured:
+
+- **Node.js** — required runtime
+- **AWS CLI** — required for credential management
+- **SAM CLI** — required for deployment
+- **AWS credentials** — valid credentials in the current profile
+- **Bedrock model access** — confirms the configured model is available in the target region
+
+```bash
+npx mergewatch@latest check
+```
+
+<Warning>
+If any check fails, `init` and `upgrade` will refuse to proceed. Fix the reported issues before continuing.
+</Warning>
+
+---
+
+## version
+
+Prints the currently installed CLI version.
+
+```bash
+npx mergewatch@latest version
+```
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Install MergeWatch" icon="download" href="/self-hosting/install">
+    Get started with the setup wizard.
+  </Card>
+  <Card title="Environment Variables" icon="key" href="/reference/env-vars">
+    See all Lambda environment variables.
+  </Card>
+</CardGroup>

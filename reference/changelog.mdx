@@ -1,10 +1,29 @@
 ---
 title: "Changelog"
-description: "MergeWatch release history"
+description: "Release history for MergeWatch."
 ---
 
-<Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
-</Note>
+All notable changes to MergeWatch are documented here. This project follows [Keep a Changelog](https://keepachangelog.com/) format.
+
+---
+
+## [0.1.0] — 2026-03-01
+
+### Added
+
+- Multi-agent parallel review pipeline (security, logic, style, summary agents)
+- GitHub App with manifest flow — one-command setup via `npx mergewatch@latest init`
+- AWS SAM template for fully serverless self-hosted deployment
+- SQS FIFO queue for sequential per-PR review processing
+- DynamoDB review history with 90-day TTL
+- `.mergewatch.yml` configuration with per-repo agent customization
+- Cross-region Bedrock inference profile support
+- Dashboard (Next.js) with review history, repo management, and settings
+- CLI: `init`, `health`, `logs`, `check`, `upgrade`, `version`
+- AGPL v3 license
+
+### Known limitations
+
+- v0.1 is diff-only — agents do not have access to full file context beyond the PR diff hunk
+- GitHub Enterprise Server not yet supported (Cloud only)
+- No GitLab or Bitbucket support (GitHub only in v0.1)

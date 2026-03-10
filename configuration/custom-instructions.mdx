@@ -1,10 +1,138 @@
 ---
 title: "Custom Instructions"
-description: "Add custom prompts to guide MergeWatch reviews"
+description: "Inject project-specific guidance into agent prompts to tailor review focus."
 ---
 
+Custom instructions let you inject free-text guidance into every agent's system prompt, right before the diff. Use them to tell MergeWatch about your stack, coding conventions, and the areas you care about most.
+
+## What custom instructions are
+
+When an agent reviews a pull request, its system prompt is assembled in this order:
+
+<Steps>
+<Step title="Built-in agent prompt">
+  The default prompt for the agent (e.g., security, logic, style).
+</Step>
+<Step title="Custom instructions">
+  Your free-text instructions are appended to the system prompt, giving the agent project-specific context.
+</Step>
+<Step title="Diff payload">
+  The pull request diff is provided as the final input for the agent to analyze.
+</Step>
+</Steps>
+
+Custom instructions do not replace the built-in prompt — they extend it. This means agents retain their core capabilities while gaining awareness of your project's specific needs.
+
+## Two levels, one priority
+
+Custom instructions can be set at two levels:
+
+| Level | Where to set it | Scope |
+|---|---|---|
+| **Installation-level** | Dashboard > [Settings](/dashboard/settings) > Custom Instructions | Applies to **all repositories** in the installation |
+| **Repo-level** | `.mergewatch.yml` under `agents[].prompt` | Applies to a **specific agent** in a **specific repo** |
+
+<Warning>
+Repo-level instructions **override** installation-level instructions. They do **not** concatenate. If you set a `prompt` for the `security` agent in `.mergewatch.yml`, the installation-level custom instructions are ignored entirely for that agent in that repository.
+</Warning>
+
+**How it works in practice:**
+
+- If no repo-level `prompt` is set for an agent, the installation-level custom instructions are used as a shared prefix.
+- If a repo-level `prompt` is set, it completely replaces the installation-level instructions for that agent.
+- Other agents in the same repo that do not have a repo-level `prompt` continue to use the installation-level instructions.
+
+## Examples for common stacks
+
+<CodeGroup>
+
+```yaml TypeScript / React
+version: 1
+agents:
+  - name: security
+    prompt: "Flag any use of dangerouslySetInnerHTML. Check for XSS in user-facing components."
+  - name: style
+    prompt: "Flag 'any' type usage — prefer explicit types. Require explicit return types on exported functions. Use 'const' over 'let' where possible."
+  - name: logic
+    prompt: "Watch for missing null checks on optional chaining results used in array methods."
+```
+
+```yaml Django / Python
+version: 1
+agents:
+  - name: security
+    prompt: "Flag SQL injection via raw() querysets. Check for CSRF exemptions, unvalidated redirects, and missing input sanitization."
+  - name: style
+    prompt: "Enforce PEP 8. Flag any use of print() — use logging module instead. Require docstrings on public functions."
+  - name: logic
+    prompt: "Check for N+1 queries in views. Flag missing select_related/prefetch_related on QuerySet iterations."
+```
+
+```yaml Monorepo
+version: 1
+agents:
+  - name: logic
+    prompt: "Flag cross-service-boundary imports. Services in services/* must not import from other services directly — use the shared/ directory."
+  - name: security
+    prompt: "Each service has its own auth middleware. Flag any request handler missing auth decoration."
+  - name: style
+    prompt: "Each service owns its own DB models. Flag any model import that crosses service boundaries."
+```
+
+</CodeGroup>
+
+## Character limits
+
+Custom instructions have the following character limits:
+
+| Level | Limit |
+|---|---|
+| Installation-level | 1000 characters per agent |
+| Repo-level (`agents[].prompt`) | 1000 characters per agent |
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+When no repo-level override is present, the installation-level instructions serve as a shared prefix appended to the built-in agent prompt. Keep them concise to leave room for the diff payload in the model's context window.
 </Note>
+
+## What makes a good custom instruction
+
+<AccordionGroup>
+
+<Accordion title="Be specific, not generic">
+**Good:** "Flag any use of `eval()` or `Function()` constructor in client-side code."
+
+**Bad:** "Find security issues." (The agent already does this by default.)
+</Accordion>
+
+<Accordion title="Name your stack explicitly">
+**Good:** "This is a Next.js 14 app using App Router. Flag any use of `getServerSideProps` — we use Server Components instead."
+
+**Bad:** "Follow framework best practices." (Which framework?)
+</Accordion>
+
+<Accordion title="Use negative examples">
+**Good:** "Do NOT flag missing semicolons — our Prettier config handles that. DO flag unused imports."
+
+**Bad:** "Check code style." (Too broad, overlaps with linters.)
+</Accordion>
+
+<Accordion title="Keep it short">
+Instructions under **200 characters** tend to produce the most focused results. Longer instructions risk diluting the agent's attention across too many concerns.
+</Accordion>
+
+</AccordionGroup>
+
+<Tip>
+Start with one or two instructions per agent and observe the results in your first few reviews. Add more specificity only where the agent is missing issues or producing false positives.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title=".mergewatch.yml Reference" icon="file-code" href="/configuration/mergewatch-yml">
+    Full reference for all configuration properties, defaults, and examples.
+  </Card>
+  <Card title="Skip Rules" icon="forward" href="/configuration/skip-rules">
+    Control which PRs are skipped and configure path-based and label-based rules.
+  </Card>
+</CardGroup>

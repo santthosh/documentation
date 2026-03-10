@@ -1,10 +1,55 @@
 ---
 title: "Dashboard Overview"
-description: "The MergeWatch dashboard for monitoring reviews and settings"
+description: "Monitor reviews, manage repositories, and configure MergeWatch from the dashboard."
 ---
 
+The MergeWatch dashboard is a Next.js application that provides review history, repository management, and configuration. For self-hosted deployments, it deploys alongside the SAM stack. SaaS users access it at [mergewatch.ai](https://mergewatch.ai).
+
+## Authentication
+
+MergeWatch uses GitHub OAuth via NextAuth.js. Click **Sign in with GitHub** on the login page. MergeWatch requests read access to your GitHub profile and organization membership — it does not request any repository access beyond what the GitHub App already has.
+
+## Dashboard pages
+
+| Page | What it shows |
+|---|---|
+| **Home** | Recent activity, quick stats, system health |
+| **Reviews** | Full review history with filters and detail drawer |
+| **Repositories** | All repos in scope, enable/disable toggles |
+| **Settings** | Installation-level review configuration |
+| **Profile** | Your account, connected installations |
+
+## Access control
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+Admin status is checked live against the GitHub API. Removing someone as an org owner immediately revokes their dashboard write access — no sync delay, no cache.
 </Note>
+
+- All authenticated users can view reviews and repositories
+- Only GitHub org owners can edit Settings
+- Non-owners see the Settings page in read-only mode with an explanation banner
+- All fields are disabled for non-owners — no partial access
+
+## Scoped to installation
+
+The dashboard shows data for one GitHub App installation at a time. If you belong to multiple organizations with MergeWatch installed, each has its own isolated view.
+
+Switch installations using the **org selector** in the sidenav. Repository lists, review history, and settings are all scoped to the selected installation.
+
+<Tip>
+If you install MergeWatch on both a personal account and an organization, they appear as separate installations in the selector. Data does not cross installation boundaries.
+</Tip>
+
+---
+
+<CardGroup cols={3}>
+  <Card title="Reviews" icon="magnifying-glass" href="/dashboard/reviews">
+    View review history, filter by status or severity, and inspect findings.
+  </Card>
+  <Card title="Repositories" icon="folder" href="/dashboard/repositories">
+    Manage which repositories MergeWatch actively reviews.
+  </Card>
+  <Card title="Settings" icon="gear" href="/dashboard/settings">
+    Configure installation-level review settings for all repositories.
+  </Card>
+</CardGroup>

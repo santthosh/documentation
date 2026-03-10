@@ -1,10 +1,101 @@
 ---
 title: "Upgrading"
-description: "Upgrade MergeWatch to the latest version"
+description: "Upgrade MergeWatch to the latest version."
 ---
 
+## CLI upgrade (recommended)
+
+The fastest way to upgrade is with the CLI:
+
+```bash
+npx mergewatch@latest upgrade
+```
+
+This command:
+
+1. Pulls the latest SAM template
+2. Runs `sam deploy` with your existing `samconfig.toml`
+3. Runs a health check to confirm the upgrade succeeded
+
+---
+
+## Manual upgrade
+
+If you deployed manually or prefer full control:
+
+```bash
+cd mergewatch.ai
+git pull origin main
+npm install
+sam build
+sam deploy
+```
+
+<Tip>
+Run `npx mergewatch@latest health` after a manual upgrade to verify everything is working.
+</Tip>
+
+---
+
+## What gets updated
+
+| Updated                     | Not modified               |
+| --------------------------- | -------------------------- |
+| Lambda function code        | DynamoDB tables and data   |
+| IAM policies (if changed)   | SSM parameters             |
+| API Gateway configuration   | Existing review history    |
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+Your DynamoDB tables and SSM parameters are never modified during upgrades. Review history and credentials are preserved.
 </Note>
+
+---
+
+## Zero-downtime upgrades
+
+SAM uses CloudFormation rolling updates. During an upgrade:
+
+- Old Lambda versions continue processing in-flight reviews
+- New reviews are routed to the updated code
+- There is no interruption to webhook delivery
+
+---
+
+## Rollback
+
+If something goes wrong, CloudFormation automatically rolls back to the previous stack version.
+
+You can also manually trigger a rollback:
+
+```bash
+aws cloudformation rollback-stack --stack-name mergewatch-prod
+```
+
+<Warning>
+Manual rollback reverts Lambda code and infrastructure to the previous deployment. It does not affect data in DynamoDB or SSM.
+</Warning>
+
+---
+
+## Version pinning
+
+To upgrade to a specific version instead of the latest:
+
+```bash
+npx mergewatch@0.1.0 upgrade
+```
+
+This is useful for testing a specific release before rolling it out broadly.
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Changelog" icon="clock-rotate-left" href="/reference/changelog">
+    See what changed in each release.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/reference/cli">
+    Full list of CLI commands and flags.
+  </Card>
+</CardGroup>

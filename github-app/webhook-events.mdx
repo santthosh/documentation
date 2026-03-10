@@ -1,10 +1,57 @@
 ---
 title: "Webhook Events"
-description: "GitHub webhook events that MergeWatch subscribes to"
+description: "GitHub webhook events MergeWatch subscribes to and how each is handled."
 ---
 
+## Subscribed events
+
+MergeWatch subscribes to the following GitHub webhook events:
+
+| Event | Action | What MergeWatch does |
+|---|---|---|
+| `pull_request` | `opened` | Enqueues a full review |
+| `pull_request` | `synchronize` | Enqueues a re-review for the new commits |
+| `pull_request` | `reopened` | Enqueues a full review |
+| `issue_comment` | `created` | Checks for `@mergewatch` mention, triggers review or summary |
+| `installation` | `created` | Registers the installation in DynamoDB |
+| `installation` | `deleted` | Marks the installation as removed |
+| `installation_repositories` | `added` | Adds repos to the installation record |
+| `installation_repositories` | `removed` | Removes repos from the installation record |
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+Only the events and actions listed above trigger processing. All other webhook deliveries are acknowledged but ignored.
 </Note>
+
+## Webhook security
+
+All incoming webhooks are signed by GitHub using **HMAC-SHA256**. The WebhookHandler Lambda validates the `X-Hub-Signature-256` header against the stored webhook secret before processing any event.
+
+<Warning>
+Invalid signatures are rejected with a `401 Unauthorized` response. If you see 401 errors in your GitHub App webhook delivery log, verify that the webhook secret in AWS SSM Parameter Store matches the value in your GitHub App settings.
+</Warning>
+
+## Retry behavior
+
+GitHub automatically retries webhook deliveries that receive non-2xx responses. To prevent duplicate processing, MergeWatch always returns a `200 OK` response to GitHub, even when an internal error occurs. Errors are captured and handled asynchronously:
+
+- Failed reviews are logged to CloudWatch.
+- The original webhook payload is preserved for debugging.
+- No duplicate review is triggered by a GitHub retry.
+
+## Payload size
+
+GitHub webhook payloads do **not** include the full diff of a pull request. After receiving a `pull_request` webhook event, MergeWatch fetches the diff separately via the GitHub REST API using the installation access token. This ensures MergeWatch always works with the complete diff regardless of payload size limits.
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Permissions reference" icon="shield-check" href="/github-app/permissions">
+  Review the GitHub permissions MergeWatch requests and why each is needed.
+</Card>
+
+<Card title="Architecture" icon="sitemap" href="/deployment/architecture">
+  Understand how webhooks flow through the MergeWatch deployment stack.
+</Card>
+
+</CardGroup>

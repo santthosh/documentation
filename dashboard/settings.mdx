@@ -1,10 +1,84 @@
 ---
 title: "Settings"
-description: "Configure installation-level MergeWatch settings"
+description: "Configure installation-level review settings for all repositories."
 ---
 
+The Settings page controls review behavior for all repositories in the current installation. These settings act as defaults — a `.mergewatch.yml` file in any repository overrides them for that repo.
+
+## Who can edit
+
+Only GitHub org owners can modify settings. Non-owners see the full Settings page in read-only mode with a banner explaining why all fields are disabled.
+
+<Warning>
+Admin status is verified server-side on every save. Even if the UI is manipulated, the API rejects changes from non-admin users.
+</Warning>
+
+## Precedence
+
 <Note>
-  This page is coming soon. In the meantime, open a
-  [GitHub Discussion](https://github.com/santthosh/mergewatch.ai/discussions)
-  if you have questions about this topic.
+Settings configured here apply to all repositories in the installation. A `.mergewatch.yml` file checked into a repository always takes precedence. See [Configuration priority](/configuration/mergewatch-yml#configuration-priority) for the full resolution order.
 </Note>
+
+## Comments
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| **Severity threshold** | Dropdown | `info` | Minimum severity level to post as a comment. Findings below this threshold are suppressed. |
+| **Comment types** | Checkboxes | All enabled | Which comment types to post: inline review comments, summary comment, architecture diagram. |
+| **Max comments per review** | Number | `25` | Upper limit on findings posted per PR. Prevents noisy reviews on large changesets. |
+
+## PR Summary
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| **Enable summary** | Toggle | On | Post a high-level summary comment on each PR. |
+| **Include confidence score** | Toggle | On | Show the AI confidence score in the summary. |
+| **Include issues table** | Toggle | On | Add a severity-ranked table of all findings to the summary. |
+| **Include architecture diagram** | Toggle | On | Render a Mermaid architecture diagram in the summary comment. |
+
+## Custom Instructions
+
+A free-text field for instructions that are injected into every agent prompt across all repositories in the installation.
+
+<Tip>
+Use custom instructions to encode team-wide conventions: "We use structured logging — flag any use of console.log in production code" or "All API endpoints must validate input with Zod schemas."
+</Tip>
+
+The field has a **1,000 character limit** with a live character counter. Repository-level custom instructions in `.mergewatch.yml` override this field for that repo.
+
+## Comment Header
+
+A text input that sets the header line prepended to every MergeWatch comment. The default value is:
+
+```
+> *Review by MergeWatch*
+```
+
+A live preview below the input shows exactly how the header will render on GitHub. Supports Markdown formatting.
+
+## Saving changes
+
+The **Save** button activates only when you have unsaved changes. It is permanently disabled for non-admin users.
+
+<Steps>
+<Step title="Make changes">
+  Modify any setting on the page. The Save button becomes active and shows unsaved changes.
+</Step>
+<Step title="Click Save">
+  The dashboard sends a `PATCH` request to `/api/settings`. The server re-verifies your admin status before applying changes.
+</Step>
+<Step title="Confirmation">
+  A success toast confirms the settings were saved. Changes take effect on the next PR review — in-progress reviews use the settings that were active when they started.
+</Step>
+</Steps>
+
+---
+
+<CardGroup cols={2}>
+  <Card title=".mergewatch.yml Reference" icon="file-code" href="/configuration/mergewatch-yml">
+    Override any installation-level setting on a per-repo basis.
+  </Card>
+  <Card title="Custom Instructions" icon="pen" href="/configuration/custom-instructions">
+    Detailed guide on writing effective custom instructions for the review agents.
+  </Card>
+</CardGroup>
