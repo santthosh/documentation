@@ -20,10 +20,6 @@ description: Frequently asked questions about MergeWatch.
     - **SaaS:** Use the hosted version at mergewatch.ai. No infrastructure to manage. First 20 PR reviews per month are free, then $0.35 per PR.
   </Accordion>
 
-  <Accordion title="What happened to BYOC (Bring Your Own Cloud)?">
-    BYOC has been removed. MergeWatch now has two modes: **self-hosted** (Docker Compose on any machine) and **SaaS** (hosted at mergewatch.ai). If you previously used BYOC, the self-hosted option gives you equivalent control over your infrastructure.
-  </Accordion>
-
   <Accordion title="Do I need an AWS account to self-host?">
     No. Self-hosted MergeWatch runs entirely with Docker and does not require any AWS services. The only scenario where you need an AWS account is if you set `LLM_PROVIDER=bedrock` to use Amazon Bedrock as your LLM backend. All other providers (Anthropic, LiteLLM, Ollama) work without AWS.
   </Accordion>
