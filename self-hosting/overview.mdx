@@ -42,7 +42,7 @@ The Docker image (`ghcr.io/santthosh/mergewatch:latest`) runs an Express server 
 1. Receives GitHub webhooks on `/webhook` (port 3000)
 2. Validates the HMAC-SHA256 signature
 3. Fetches the PR diff from GitHub
-4. Runs five review agents in parallel against your chosen LLM
+4. Runs eight review agents in parallel against your chosen LLM
 5. Posts review comments and a Check Run back to the PR
 6. Stores the review record in PostgreSQL
 

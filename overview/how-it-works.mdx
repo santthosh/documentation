@@ -108,6 +108,10 @@ sequenceDiagram
   <Step title="Results posted to GitHub">
     MergeWatch posts a **Check Run** with a status and conclusion, plus inline review comments on the relevant lines.
 
+    - MergeWatch adds a :eyes: reaction to the PR when starting a review to signal that analysis is underway.
+    - On re-review, MergeWatch dismisses stale reviews before posting new ones.
+    - The summary comment is edited in place (not duplicated) on re-review.
+
     **SaaS:** The review record is written to DynamoDB.
 
     **Self-Hosted:** The review record is written to PostgreSQL.
@@ -165,13 +169,13 @@ After all agents complete, the orchestrator:
 2. **Ranks** — findings are sorted by severity (critical > warning > info), then by confidence descending.
 3. **Scores** — a merge readiness score from 1 to 5 is computed:
 
-| Score | Meaning |
-|---|---|
-| 5 | No issues found. Ship it. |
-| 4 | Minor suggestions only (info-level). |
-| 3 | Warnings present. Review recommended before merge. |
-| 2 | Critical findings with moderate confidence. Do not merge without addressing. |
-| 1 | High-confidence critical findings. Merge blocked. |
+| Score | Criteria | Meaning |
+|---|---|---|
+| 5 | No critical findings, at most 1 warning | No issues found. Ship it. |
+| 4 | No critical findings, 2-3 warnings | Minor suggestions only. |
+| 3 | No critical findings but 4+ warnings, OR exactly 1 critical finding | Warnings present. Review recommended before merge. |
+| 2 | 2 or more critical findings | Critical findings present. Do not merge without addressing. |
+| 1 | 3+ critical findings or a major security vulnerability | High-confidence critical findings. Merge blocked. |
 
 ## Codebase awareness
 
@@ -295,6 +299,18 @@ MergeWatch uses the GitHub [Check Runs API](https://docs.github.com/en/rest/chec
 - **`output.summary`**: The summary agent's output plus the orchestrator's ranked findings
 
 This integrates with GitHub's branch protection rules — you can require the MergeWatch check to pass before merging.
+
+## GitHub review events
+
+MergeWatch maps merge-readiness scores to GitHub review events:
+
+| Merge score | GitHub review event | Effect |
+|---|---|---|
+| 4-5 | `APPROVE` | PR shows as approved by MergeWatch |
+| 2-3 | `COMMENT` | PR shows review comments without approval |
+| 1 | `REQUEST_CHANGES` | PR shows changes requested by MergeWatch |
+
+This integrates with GitHub's required reviewers — if MergeWatch is a required reviewer, low scores can block merging.
 
 ---
 
