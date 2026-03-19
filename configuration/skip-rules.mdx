@@ -27,11 +27,19 @@ The following conditions cause MergeWatch to skip a pull request automatically:
 | All changed files are lock files | Skip | Remove lock patterns from `ignore_patterns` |
 | All changed files in `dist/**` or `vendor/**` | Skip | Remove from `ignore_patterns` |
 | PR title contains `[skip ci]` or `[skip review]` | Skip | Not configurable |
+| All changed files are minified (*.min.js, *.min.css) | Skip | Remove minified patterns from `ignore_patterns` |
+| All changed files are in generated directories (node_modules/**, build/**) | Skip | Remove from `ignore_patterns` |
+| PR is pure documentation (only *.md files) | Skip | Remove *.md from `ignore_patterns` |
+| PR author is MergeWatch (loop prevention) | Skip | Not configurable |
 | PR has the `skip-review` label | Skip | Remove from `rules.ignore_labels` |
 
 <Tip>
 The `[skip ci]` and `[skip review]` title markers are always honored and cannot be overridden. This gives developers a reliable escape hatch when they know a PR does not need review.
 </Tip>
+
+<Note>
+MergeWatch automatically skips PRs authored by itself to prevent infinite review loops.
+</Note>
 
 ## Path-based skip rules
 
