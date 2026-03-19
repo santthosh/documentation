@@ -22,6 +22,8 @@ MergeWatch subscribes to the following GitHub webhook events:
 Only the events and actions listed above trigger processing. All other webhook deliveries are acknowledged but ignored.
 </Note>
 
+MergeWatch recognizes three mention commands: `@mergewatch review` (full review), `@mergewatch summary` (summary only), and `@mergewatch` with any other text (contextual response). All mentions are case-insensitive.
+
 ## Webhook security
 
 All incoming webhooks are signed by GitHub using **HMAC-SHA256**. The WebhookHandler Lambda validates the `X-Hub-Signature-256` header against the stored webhook secret before processing any event.

@@ -19,8 +19,14 @@ MergeWatch triggers a review when it receives any of the following GitHub webhoo
 <Step title="pull_request.reopened">
   A previously closed pull request is reopened. MergeWatch treats this the same as a new PR and runs a fresh review.
 </Step>
-<Step title="issue_comment.created (manual re-trigger)">
-  A comment is posted on a pull request containing `@mergewatch review`. This works even when `auto_review` is set to `false` in your configuration.
+<Step title="issue_comment.created (manual trigger)">
+  A comment is posted on a pull request mentioning `@mergewatch`. MergeWatch recognizes three mention commands:
+
+  - `@mergewatch review` — triggers a full review (all agents)
+  - `@mergewatch summary` — triggers a summary-only review (summary agent only)
+  - `@mergewatch` (any other mention) — responds to the user's comment contextually
+
+  All mentions are case-insensitive. This works even when `auto_review` is set to `false` in your configuration.
 </Step>
 </Steps>
 
@@ -78,6 +84,14 @@ This works in all scenarios:
 - On PRs that were previously skipped (the skip rules are re-evaluated)
 
 When a re-triggered review completes, it **replaces the previous summary comment** with the new results. Inline findings are posted fresh alongside any existing comments.
+
+To request only a summary without a full review:
+
+```
+@mergewatch summary
+```
+
+This runs the summary agent only and posts a high-level overview of the PR without inline findings.
 
 ## Confidence scores
 
