@@ -11,7 +11,7 @@ When a pull request triggers a review, the PR diff is fetched by the **ReviewAge
 
 ## Bedrock model calls
 
-All LLM inference runs on Amazon Bedrock within MergeWatch's AWS account. The default model is `us.anthropic.claude-sonnet-4-20250514-v1:0`. Model inputs (diff content, agent prompts) and outputs (review findings) exist only for the duration of the API call and are not logged or stored by MergeWatch beyond the review lifecycle.
+All LLM inference runs on Amazon Bedrock within MergeWatch's AWS account. The primary model is `us.anthropic.claude-sonnet-4-20250514-v1:0` for review agents. Lighter tasks such as summary generation and diagram creation use `us.anthropic.claude-haiku-4-5-20251001-v1:0` for cost efficiency. Model inputs (diff content, agent prompts) and outputs (review findings) exist only for the duration of the API call and are not logged or stored by MergeWatch beyond the review lifecycle.
 
 ## What is stored
 
@@ -21,6 +21,9 @@ All LLM inference runs on Amazon Bedrock within MergeWatch's AWS account. The de
 - Repository name and PR number
 - Merge-readiness score
 - Per-agent latency data
+- Settings snapshot (configuration used for the review)
+- GitHub reactions data
+- User feedback (thumbs up/down)
 - Review status (success, error, skipped)
 
 Review metadata has a **90-day TTL** and is automatically deleted after expiration.
@@ -43,6 +46,7 @@ Your `.mergewatch.yml` configuration file stays in your GitHub repository. Merge
 | **GitHub credentials** | Yes | Stored encrypted in SSM Parameter Store. |
 | **Your `.mergewatch.yml`** | Temporarily | Read at review time via GitHub API. Not copied. |
 | **Secrets in your code** | No | MergeWatch does not scan or store secrets. If a secret appears in a diff, it is processed in-memory like any other diff content and not persisted. |
+| **Review feedback** | Yes | Thumbs up/down feedback stored with the review record. |
 | **Other repos / branches** | No | Only the PR's head and base branches are diffed. |
 
 ## Maximum data isolation

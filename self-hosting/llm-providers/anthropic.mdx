@@ -17,14 +17,14 @@ Set these environment variables in your `.env` file or container environment:
 
 ## Default model
 
-MergeWatch uses **`claude-3-5-haiku-20241022`** by default. This model provides an excellent balance of speed, quality, and cost for code review tasks.
+MergeWatch uses **`claude-haiku-4-5-20251001`** (Claude 4.5 Haiku) by default. This model provides an excellent balance of speed, quality, and cost for code review tasks.
 
 ## Model override
 
 To use a higher-capability model, set `LLM_MODEL` in your environment:
 
 ```bash
-LLM_MODEL=claude-3-5-sonnet-20241022
+LLM_MODEL=claude-sonnet-4-20250514
 ```
 
 Sonnet produces more detailed reviews and catches subtler issues, at a higher per-token cost.
@@ -37,7 +37,7 @@ LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
 # Optional: override the default model
-# LLM_MODEL=claude-3-5-sonnet-20241022
+# LLM_MODEL=claude-sonnet-4-20250514
 ```
 
 ## Pricing
@@ -45,7 +45,7 @@ ANTHROPIC_API_KEY=sk-ant-api03-...
 You pay Anthropic directly for API usage. MergeWatch does not add any markup or proxy fees. See the [Anthropic pricing page](https://www.anthropic.com/pricing#702702) for current per-token rates.
 
 <Tip>
-Claude 3.5 Haiku is one of the most cost-effective models for code review. Most repositories see costs under $5/month with typical PR volumes.
+Claude 4.5 Haiku is one of the most cost-effective models for code review. Most repositories see costs under $5/month with typical PR volumes.
 </Tip>
 
 ## Next steps
