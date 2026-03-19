@@ -37,6 +37,20 @@ version: 1
 # Model used for all agents. Must be a valid Bedrock model ID.
 model: anthropic.claude-sonnet-4-20250514
 
+# Language hint for the LLM.
+language: typescript
+
+# Review scope: "changed-files" or "full-diff".
+reviewScope: changed-files
+
+# Codebase awareness — enable agentic file fetching for cross-file context.
+codebaseAwareness: true
+maxFileRequestRounds: 1
+maxContextKB: 256
+
+# Free-text appended to every agent's system prompt.
+customPrompt: "This is a Node.js backend service using Express and Drizzle ORM."
+
 # Agent configuration — enable, disable, or customize each built-in agent.
 agents:
   - name: security
@@ -51,7 +65,20 @@ agents:
     enabled: true
     prompt: "Enforce project conventions. Be concise."
 
+  - name: errorHandling
+    enabled: true
+
+  - name: testCoverage
+    enabled: true
+
   - name: summary
+    enabled: true
+
+# Custom agents — define your own review agents with custom prompts.
+custom_agents:
+  - name: api-consistency
+    prompt: "Check that all new API endpoints follow our REST conventions: plural resource names, consistent error response format, and proper HTTP status codes."
+    severityDefault: warning
     enabled: true
 
 # Review rules — control scope and trigger behavior.
@@ -63,6 +90,9 @@ rules:
     - "dist/**"
   auto_review: true
   review_on_mention: true
+  skip_drafts: true
+  ignore_labels:
+    - "skip-review"
 
 # How findings are posted: "inline" or "summary".
 comment_style: inline
@@ -82,22 +112,32 @@ comment_style: inline
 | `min_severity` | `string` | `info` | Minimum severity level to report. One of `info`, `warning`, `error`, `critical`. Findings below this threshold are suppressed. |
 | `max_findings` | `number` | `25` | Maximum number of findings posted per review. Prevents noisy reviews on large PRs. |
 | `post_summary_on_clean` | `boolean` | `true` | When `true`, MergeWatch posts a summary comment even when no findings are detected. Set to `false` to stay silent on clean PRs. |
+| `language` | `string` | — | Language hint for the LLM (e.g., `"typescript"`, `"python"`). Helps agents produce more relevant findings. |
+| `reviewScope` | `string` | `changed-files` | Review scope: `changed-files` (review only changed files) or `full-diff` (review the complete diff). |
+| `maxFileSize` | `number` | — | Maximum file size in KB to include in review. Files larger than this are skipped. |
+| `customPrompt` | `string` | — | Free-text appended to every agent's system prompt. Use this to provide project-wide context. |
+| `codebaseAwareness` | `boolean` | `true` | Enable agentic file fetching for cross-file context. When `true`, agents can request additional files from the repository. |
+| `maxFileRequestRounds` | `number` | `1` | Maximum rounds of file fetching per agent (1--2). Each round lets the agent request more files based on what it learned. |
+| `maxContextKB` | `number` | `256` | Maximum total context size in KB for fetched files per agent. Prevents runaway context expansion. |
+| `customStyleRules` | `string[]` | `[]` | Additional style rules applied to the style agent. Each entry is a rule string. |
+| `excludePatterns` | `string[]` | `[]` | File patterns to exclude from review (in addition to `ignore_patterns` in `rules`). |
 | `agents` | `Agent[]` | See [Agents](#agents) | List of agent configurations. |
+| `custom_agents` | `CustomAgent[]` | `[]` | List of custom agent definitions. See [Custom agents](#custom-agents). |
 | `rules` | `object` | See [Rules](#rules) | Review scope and trigger rules. |
 
 ### Agents
 
-Each entry in the `agents` array configures one of the built-in review agents. You can enable, disable, or customize their prompts — but you cannot define new agent types. The pipeline is fixed to these five agents.
+Each entry in the `agents` array configures one of the eight built-in review agents. You can enable, disable, or customize their prompts. For entirely new agent types, see [Custom agents](#custom-agents) below.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `name` | `string` | — | Agent identifier. Must be one of: `security`, `bugs`, `style`, `summary`, `diagram`. |
+| `name` | `string` | — | Agent identifier. Must be one of: `security`, `bugs`, `style`, `summary`, `diagram`, `errorHandling`, `testCoverage`, `commentAccuracy`. |
 | `enabled` | `boolean` | `true` | Set to `false` to disable the agent entirely. |
 | `prompt` | `string` | Built-in prompt | Custom system prompt for the agent. Overrides the default prompt. Use this to tailor the agent to your project's stack and conventions. |
 
-<Warning>
-Custom agent types are not supported. The `name` field must match one of the five built-in agents listed below. Unrecognized names are ignored.
-</Warning>
+<Note>
+In addition to the eight built-in agents, you can define custom agents using the `custom_agents` array. See [Custom agents](#custom-agents) below.
+</Note>
 
 <Tip>
 You do not need to list all agents. Omitted agents use their built-in defaults with `enabled: true`. To disable a single agent, include only that agent with `enabled: false`.
@@ -110,8 +150,35 @@ You do not need to list all agents. Omitted agents use their built-in defaults w
 | `security` | Enabled | OWASP Top 10, secrets detection, injection flaws, unsafe deserialization |
 | `bugs` | Enabled | Logic errors, off-by-one, null dereferences, race conditions |
 | `style` | Enabled | Code style, naming conventions, project-specific patterns |
+| `errorHandling` | Enabled | Empty catch blocks, swallowed errors, unhandled promise rejections |
+| `testCoverage` | Enabled | Missing tests for new public functions, untested edge cases |
+| `commentAccuracy` | Enabled | Misleading or outdated code comments, incorrect JSDoc |
 | `summary` | Enabled | High-level PR summary with risk rating (uses the light model) |
 | `diagram` | Enabled | Mermaid diagram of the changed control flow (uses the light model) |
+
+### Custom agents
+
+You can define custom agents using the `custom_agents` array. Custom agents run in parallel alongside the built-in agents and follow the same output schema.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `name` | `string` | — | A unique identifier for the custom agent. |
+| `prompt` | `string` | — | **(Required)** The system prompt for the agent. This defines what the agent looks for in the code. |
+| `severityDefault` | `string` | `"warning"` | Default severity for findings from this agent. One of: `"info"`, `"warning"`, `"critical"`. |
+| `enabled` | `boolean` | `true` | Set to `false` to disable the custom agent. |
+
+```yaml
+custom_agents:
+  - name: api-consistency
+    prompt: "Check that all new API endpoints follow REST conventions: plural resource names, consistent error response format, and proper HTTP status codes."
+    severityDefault: warning
+    enabled: true
+
+  - name: i18n-compliance
+    prompt: "Flag any user-facing strings that are not wrapped in a translation function (t() or i18n()). All UI text must be translatable."
+    severityDefault: info
+    enabled: true
+```
 
 ### Rules
 
@@ -123,6 +190,8 @@ The `rules` object controls which files are reviewed and when reviews are trigge
 | `ignore_patterns` | `string[]` | `["*.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "dist/**", "node_modules/**"]` | Glob patterns for files to exclude from review. Matched against the file path relative to the repo root. |
 | `auto_review` | `boolean` | `true` | When `true`, MergeWatch reviews every PR automatically on open and synchronize events. |
 | `review_on_mention` | `boolean` | `true` | When `true`, MergeWatch runs a review when mentioned in a PR comment (e.g., `@mergewatch review`). Works even if `auto_review` is `false`. |
+| `skip_drafts` | `boolean` | `true` | Skip draft pull requests. Set to `false` to review drafts automatically. |
+| `ignore_labels` | `string[]` | `["skip-review"]` | Skip PRs with any of these GitHub labels. PRs matching these labels are not reviewed. |
 
 ## Minimal configuration
 
@@ -132,7 +201,7 @@ If the defaults work for you, the smallest valid configuration is:
 version: 1
 ```
 
-This enables all five agents with their default prompts, uses Claude Sonnet via Bedrock, and reviews PRs automatically.
+This enables all eight built-in agents with their default prompts, uses Claude Sonnet via Bedrock, and reviews PRs automatically.
 
 ## Common patterns
 

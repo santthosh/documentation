@@ -33,6 +33,9 @@ sequenceDiagram
         RA->>BR: Security agent
         RA->>BR: Bug detection agent
         RA->>BR: Style agent
+        RA->>BR: Error handling agent
+        RA->>BR: Test coverage agent
+        RA->>BR: Comment accuracy agent
         RA->>BR: Summary agent
         RA->>BR: Diagram agent
     end
@@ -63,6 +66,9 @@ sequenceDiagram
         EX->>LLM: Security agent
         EX->>LLM: Bug detection agent
         EX->>LLM: Style agent
+        EX->>LLM: Error handling agent
+        EX->>LLM: Test coverage agent
+        EX->>LLM: Comment accuracy agent
         EX->>LLM: Summary agent
         EX->>LLM: Diagram agent
     end
@@ -91,10 +97,10 @@ sequenceDiagram
 
     **Self-Hosted:** The Express server processes the review in the same process, running the agent pipeline asynchronously after acknowledging the webhook.
 
-    In both modes, the PR diff is fetched from the GitHub API using the installation token, then fanned out to five specialized agents.
+    In both modes, the PR diff is fetched from the GitHub API using the installation token, then fanned out to eight specialized agents.
   </Step>
   <Step title="Multi-agent parallel review">
-    Five agents run concurrently via `Promise.all()` — see [the pipeline](#the-multi-agent-pipeline) below. Each agent receives the diff and returns structured JSON findings.
+    Eight agents run concurrently via `Promise.all()` — see [the pipeline](#the-multi-agent-pipeline) below. Each agent receives the diff and returns structured JSON findings.
   </Step>
   <Step title="Orchestration">
     The orchestrator agent receives all findings, deduplicates overlapping comments, ranks by severity and confidence, and produces a merge readiness score (1--5).
@@ -110,17 +116,20 @@ sequenceDiagram
 
 ## The multi-agent pipeline
 
-Five specialized agents run in parallel. Each is a separate LLM invocation with a focused system prompt.
+Eight specialized agents run in parallel. Each is a separate LLM invocation with a focused system prompt.
 
 | Agent | Responsibility | Example finding |
 |---|---|---|
 | **Security** | SQL injection, XSS, secrets in code, dependency vulnerabilities | "User input passed to `exec()` without sanitization" |
 | **Bug detection** | Null derefs, off-by-ones, race conditions, logic errors | "Array index `i + 1` can exceed `arr.length`" |
 | **Style** | Naming conventions, dead code, missing types, readability | "Exported function `processData` has no JSDoc" |
+| **Error handling** | Empty catch blocks, swallowed errors, unhandled promise rejections | "Promise rejection in `fetchUser()` is caught but silently ignored" |
+| **Test coverage** | Missing tests for new public functions, untested edge cases | "New exported function `validateInput()` has no corresponding test" |
+| **Comment accuracy** | Misleading or outdated code comments, incorrect JSDoc | "JSDoc says `@returns string` but function returns `Promise<string>`" |
 | **Summary** | Human-readable summary of the PR's intent and scope | "Adds rate limiting to the `/api/upload` endpoint" |
 | **Diagram** | Generates a Mermaid diagram of the changed control flow | Mermaid sequence or flowchart of the new code path |
 
-All five agents run via `Promise.all()` — the total latency is bounded by the slowest agent, not the sum.
+All eight agents run via `Promise.all()` — the total latency is bounded by the slowest agent, not the sum.
 
 ### Agent output schema
 
@@ -166,15 +175,21 @@ After all agents complete, the orchestrator:
 
 ## Codebase awareness
 
-<Info>
-MergeWatch v0.1 operates at **diff-only** awareness. The agents see the PR diff and nothing else.
-</Info>
+MergeWatch supports **agentic file fetching** for cross-file context. When enabled, agents can request additional files from the repository via the GitHub API to understand surrounding context — such as imported modules, type definitions, or test files — beyond what the PR diff includes.
 
-| Version | Awareness level | What agents see |
-|---|---|---|
-| **v0.1** (current) | Diff-only | The unified diff from the PR. No surrounding file context beyond what the diff hunk includes. |
-| **v0.2** (planned) | Diff + file fetch | Full contents of changed files fetched via the GitHub API, giving agents complete function and class context. |
-| **v0.3** (planned) | Diff + vector index | An embedding index of the full repository, enabling agents to understand cross-file dependencies and architectural patterns. |
+Codebase awareness is controlled by three configuration options in `.mergewatch.yml`:
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `codebaseAwareness` | `boolean` | `true` | Enable agentic file fetching. When `true`, agents can request additional files for cross-file context. |
+| `maxFileRequestRounds` | `number` | `1` | Maximum rounds of file fetching per agent. Each round lets the agent request more files based on what it learned in the previous round. Maximum value is `2`. |
+| `maxContextKB` | `number` | `256` | Maximum total size (in KB) of fetched files per agent. Prevents runaway context expansion on large repositories. |
+
+<Tip>
+Codebase awareness is enabled by default. To revert to diff-only analysis (faster, lower cost), set `codebaseAwareness: false` in your `.mergewatch.yml`.
+</Tip>
+
+**Future plans:** A planned enhancement will add an embedding index of the full repository, enabling agents to understand cross-file dependencies and architectural patterns without explicit file fetching.
 
 ## Infrastructure details
 
@@ -214,7 +229,7 @@ MergeWatch v0.1 operates at **diff-only** awareness. The agents see the PR diff 
   </Card>
   <Card title="Amazon Bedrock">
     - **Default model:** `us.anthropic.claude-sonnet-4-20250514-v1:0`
-    - **Role:** Powers all five review agents and the orchestrator
+    - **Role:** Powers all eight review agents and the orchestrator
   </Card>
 </CardGroup>
 

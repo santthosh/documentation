@@ -29,7 +29,7 @@ MergeWatch is an open-source GitHub App that reviews pull requests using a multi
     Read the source, audit it, fork it, contribute back. No open-core bait-and-switch. The AGPL v3 license means improvements must be shared, which keeps the project honest.
   </Card>
   <Card title="Multi-agent parallel review pipeline" icon="diagram-project">
-    Five specialized agents — security, bugs, style, summary, and diagram — run in parallel. An orchestrator agent deduplicates overlapping findings and ranks them by severity before posting to GitHub.
+    Eight specialized agents — security, bugs, style, error handling, test coverage, comment accuracy, summary, and diagram — run in parallel. An orchestrator agent deduplicates overlapping findings and ranks them by severity before posting to GitHub.
   </Card>
 </CardGroup>
 
@@ -46,11 +46,17 @@ flowchart LR
     RA --> SEC["Security"]
     RA --> BUG["Bug detection"]
     RA --> STY["Style"]
+    RA --> ERR["Error handling"]
+    RA --> TST["Test coverage"]
+    RA --> CMT["Comment accuracy"]
     RA --> SUM["Summary"]
     RA --> DIA["Diagram"]
     SEC --> ORC["Orchestrator"]
     BUG --> ORC
     STY --> ORC
+    ERR --> ORC
+    TST --> ORC
+    CMT --> ORC
     SUM --> ORC
     DIA --> ORC
     ORC --> GH["GitHub comments"]
