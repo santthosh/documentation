@@ -12,16 +12,27 @@ MergeWatch follows the principle of least privilege. Every permission below is t
 | Permission | Level | Why it's needed |
 | --- | --- | --- |
 | **Contents** | `read` | Read the pull request diff and the `.mergewatch.yml` configuration file from the repository root. MergeWatch never writes to repository contents. |
-| **Issues** | `read & write` | Create and update PR summary comments (GitHub's API uses the Issues endpoint for PR comments), list existing comments to avoid duplicates, and add reactions (e.g., :eyes: when a review starts). |
+| **Issues** | `read` | Create and update PR summary comments (GitHub's API uses the Issues endpoint for PR comments), list existing comments to avoid duplicates, and add reactions (e.g., :eyes: when a review starts). |
 | **Metadata** | `read` | Automatically granted to all GitHub Apps. Provides access to basic repository metadata (name, description, default branch). |
 | **Pull requests** | `read & write` | Post inline review findings as PR review comments, create and dismiss reviews, and read PR metadata and diffs. This is the primary output channel for every review. |
 | **Checks** | `read & write` | Create check runs on the pull request with a findings summary, risk rating, and pass/fail status. |
+
+<Frame caption="Repository permissions — Contents (read-only), Issues (read-only), Pull requests (read & write), and Checks (read & write).">
+  <img src="/images/repo.contents-permission.png" alt="Contents permission — Read-only" />
+  <img src="/images/repo.issues-permission.png" alt="Issues permission — Read-only" />
+  <img src="/images/repo.pr-permission.png" alt="Pull requests permission — Read and write" />
+  <img src="/images/repo.checks-permission.png" alt="Checks permission — Read and write" />
+</Frame>
 
 ### Organization permissions
 
 | Permission | Level | Why it's needed |
 | --- | --- | --- |
 | **Members** | `read` | Verify that the user accessing organization-level settings in the dashboard is an org admin. No member data is stored. |
+
+<Frame caption="Organization permissions — Members (read-only).">
+  <img src="/images/org.members-permission.png" alt="Members permission — Read-only" />
+</Frame>
 
 <Info>
   All permissions are set at install time via the GitHub App manifest. You can verify them at any time in **GitHub Settings > Applications > MergeWatch > Permissions**.
@@ -55,6 +66,10 @@ MergeWatch subscribes to the following webhook events. Each event triggers a spe
 | `pull_request_review_thread` | Tracks when review comment threads are resolved or unresolved. Allows MergeWatch to track whether findings have been addressed. |
 | `issue_comment` | Listens for commands in PR comments (e.g., `@mergewatch review` to re-trigger a review). |
 | `installation` | Tracks when the app is installed or uninstalled so MergeWatch can provision or clean up repository records. |
+
+<Frame caption="Webhook event subscriptions — the checked events are the ones MergeWatch requires.">
+  <img src="/images/subscribe-to-events.png" alt="GitHub App webhook event subscriptions" />
+</Frame>
 
 <Tip>
   You can inspect every webhook delivery — including payload and response — in your GitHub App's **Advanced** tab under **Recent Deliveries**.
@@ -91,7 +106,7 @@ The Lambda execution role follows least-privilege IAM policy design.
 ## Frequently asked questions
 
 <Accordion title="Can MergeWatch modify my code?">
-  No. MergeWatch has `contents: read` only. It cannot push commits, create branches, or modify any file. The only write operations are posting review comments (`pull_requests: read & write`), creating/updating PR summary comments (`issues: read & write`), and creating check runs (`checks: read & write`).
+  No. MergeWatch has `contents: read` only. It cannot push commits, create branches, or modify any file. The only write operations are posting review comments (`pull_requests: read & write`) and creating check runs (`checks: read & write`).
 </Accordion>
 
 <Accordion title="Does MergeWatch store my source code?">
