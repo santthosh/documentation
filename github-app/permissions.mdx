@@ -7,12 +7,21 @@ MergeWatch follows the principle of least privilege. Every permission below is t
 
 ## Permission table
 
+### Repository permissions
+
 | Permission | Level | Why it's needed |
 | --- | --- | --- |
-| **Contents** | `read` | Read the pull request diff and the `.mergewatch.yml` configuration file from the repository root. MergeWatch never writes to repository contents. |
-| **Pull requests** | `write` | Post review comments and findings as inline PR comments. This is the primary output channel for every review. |
-| **Checks** | `write` | Create check runs on the pull request with a findings summary, risk rating, and pass/fail status. |
-| **Members** | `read` | Verify that the user accessing organization-level settings in the dashboard is an org admin. No member data is stored. |
+| **Checks** | `read & write` | Create check runs on the pull request with a findings summary, risk rating, and pass/fail status. <img src="/images/repo.checks-permission.png" alt="Checks — Read and write" /> |
+| **Contents** | `read` | Read the pull request diff and the `.mergewatch.yml` configuration file from the repository root. MergeWatch never writes to repository contents. <img src="/images/repo.contents-permission.png" alt="Contents — Read-only" /> |
+| **Issues** | `read` | Create and update PR summary comments (GitHub's API uses the Issues endpoint for PR comments), list existing comments to avoid duplicates, and add reactions (e.g., :eyes: when a review starts). <img src="/images/repo.issues-permission.png" alt="Issues — Read-only" /> |
+| **Metadata** | `read` | Automatically granted to all GitHub Apps. Provides access to basic repository metadata (name, description, default branch). |
+| **Pull requests** | `read & write` | Post inline review findings as PR review comments, create and dismiss reviews, and read PR metadata and diffs. This is the primary output channel for every review. <img src="/images/repo.pr-permission.png" alt="Pull requests — Read and write" /> |
+
+### Organization permissions
+
+| Permission | Level | Why it's needed |
+| --- | --- | --- |
+| **Members** | `read` | Verify that the user accessing organization-level settings in the dashboard is an org admin. No member data is stored. <img src="/images/org.members-permission.png" alt="Members — Read-only" /> |
 
 <Info>
   All permissions are set at install time via the GitHub App manifest. You can verify them at any time in **GitHub Settings > Applications > MergeWatch > Permissions**.
@@ -36,14 +45,20 @@ Equally important is what the app *cannot* do. These permissions are intentional
 
 ## Webhook events
 
-MergeWatch subscribes to four webhook events. Each event triggers a specific, scoped action.
+MergeWatch subscribes to the following webhook events. Each event triggers a specific, scoped action.
 
 | Event | Why it's subscribed |
 | --- | --- |
 | `pull_request` | Triggers the review pipeline when a PR is opened, synchronized (new commits pushed), or reopened. |
+| `pull_request_review` | Tracks when reviews are submitted, edited, or dismissed on a PR. Used to detect stale MergeWatch reviews that need to be replaced. |
+| `pull_request_review_comment` | Tracks individual review comments on PR diffs. Used to monitor threaded discussions on MergeWatch findings. |
+| `pull_request_review_thread` | Tracks when review comment threads are resolved or unresolved. Allows MergeWatch to track whether findings have been addressed. |
 | `issue_comment` | Listens for commands in PR comments (e.g., `@mergewatch review` to re-trigger a review). |
-| `installation` | Tracks when the app is installed or uninstalled so MergeWatch can provision or clean up repository records in DynamoDB. |
-| `installation_repositories` | Tracks when repositories are added to or removed from an existing installation. |
+| `installation` | Tracks when the app is installed or uninstalled so MergeWatch can provision or clean up repository records. |
+
+<Frame caption="Webhook event subscriptions — the checked events are the ones MergeWatch requires.">
+  <img src="/images/subscribe-to-events.png" alt="GitHub App webhook event subscriptions" />
+</Frame>
 
 <Tip>
   You can inspect every webhook delivery — including payload and response — in your GitHub App's **Advanced** tab under **Recent Deliveries**.
@@ -80,7 +95,7 @@ The Lambda execution role follows least-privilege IAM policy design.
 ## Frequently asked questions
 
 <Accordion title="Can MergeWatch modify my code?">
-  No. MergeWatch has `contents: read` only. It cannot push commits, create branches, or modify any file. The only write operations are posting review comments (`pull_requests: write`) and creating check runs (`checks: write`).
+  No. MergeWatch has `contents: read` only. It cannot push commits, create branches, or modify any file. The only write operations are posting review comments (`pull_requests: read & write`) and creating check runs (`checks: read & write`).
 </Accordion>
 
 <Accordion title="Does MergeWatch store my source code?">
