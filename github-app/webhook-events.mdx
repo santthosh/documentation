@@ -12,11 +12,12 @@ MergeWatch subscribes to the following GitHub webhook events:
 | `pull_request` | `opened` | Triggers a full review |
 | `pull_request` | `synchronize` | Triggers a re-review for the new commits |
 | `pull_request` | `reopened` | Triggers a full review |
+| `pull_request_review` | `submitted`, `dismissed` | Tracks review submissions and dismissals. Used to detect stale MergeWatch reviews that need replacement on re-review. |
+| `pull_request_review_comment` | `created` | Tracks individual review comments on PR diffs. Monitors threaded discussions on MergeWatch findings. |
+| `pull_request_review_thread` | `resolved`, `unresolved` | Tracks when review comment threads are resolved or unresolved. Allows MergeWatch to know whether findings have been addressed. |
 | `issue_comment` | `created` | Checks for `@mergewatch` mention, triggers review or summary |
-| `installation` | `created` | Registers the installation in DynamoDB |
+| `installation` | `created` | Registers the installation in the database |
 | `installation` | `deleted` | Marks the installation as removed |
-| `installation_repositories` | `added` | Adds repos to the installation record |
-| `installation_repositories` | `removed` | Removes repos from the installation record |
 
 <Note>
 Only the events and actions listed above trigger processing. All other webhook deliveries are acknowledged but ignored.
