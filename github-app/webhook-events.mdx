@@ -12,6 +12,7 @@ MergeWatch subscribes to the following GitHub webhook events:
 | `pull_request` | `opened` | Triggers a full review |
 | `pull_request` | `synchronize` | Triggers a re-review for the new commits |
 | `pull_request` | `reopened` | Triggers a full review |
+| `pull_request` | `ready_for_review` | Triggers a full review when a draft PR is marked as ready |
 | `pull_request_review` | `submitted`, `dismissed` | Tracks review submissions and dismissals. Used to detect stale MergeWatch reviews that need replacement on re-review. |
 | `pull_request_review_comment` | `created` | Tracks individual review comments on PR diffs. Monitors threaded discussions on MergeWatch findings. |
 | `pull_request_review_thread` | `resolved`, `unresolved` | Tracks when review comment threads are resolved or unresolved. Allows MergeWatch to know whether findings have been addressed. |
@@ -23,7 +24,7 @@ MergeWatch subscribes to the following GitHub webhook events:
 Only the events and actions listed above trigger processing. All other webhook deliveries are acknowledged but ignored.
 </Note>
 
-MergeWatch recognizes three mention commands: `@mergewatch review` (full review), `@mergewatch summary` (summary only), and `@mergewatch` with any other text (contextual response). All mentions are case-insensitive.
+MergeWatch recognizes three mention commands: `@mergewatch review` (full review), `@mergewatch summary` (summary only), and `@mergewatch` with any other text (conversational response — the LLM replies directly to the user's comment using the PR diff and previous review findings as context; no review pipeline runs). All mentions are case-insensitive.
 
 ## Webhook security
 
