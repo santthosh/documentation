@@ -30,17 +30,17 @@ Custom instructions can be set at two levels:
 | Level | Where to set it | Scope |
 |---|---|---|
 | **Installation-level** | Dashboard > [Settings](/dashboard/settings) > Custom Instructions | Applies to **all repositories** in the installation |
-| **Repo-level** | `.mergewatch.yml` under `agents[].prompt` | Applies to a **specific agent** in a **specific repo** |
+| **Repo-level** | `.mergewatch.yml` under `customAgents[].prompt` | Applies to a **specific custom agent** in a **specific repo** |
 
 <Warning>
-Repo-level instructions **override** installation-level instructions. They do **not** concatenate. If you set a `prompt` for the `security` agent in `.mergewatch.yml`, the installation-level custom instructions are ignored entirely for that agent in that repository.
+Installation-level custom instructions are appended to **all built-in agent prompts** across all repos. Repo-level prompts are only available on **custom agents** defined in `customAgents`. Built-in agent prompts cannot be overridden via `.mergewatch.yml` — use custom agents to add domain-specific review logic.
 </Warning>
 
 **How it works in practice:**
 
-- If no repo-level `prompt` is set for an agent, the installation-level custom instructions are used as a shared prefix.
-- If a repo-level `prompt` is set, it completely replaces the installation-level instructions for that agent.
-- Other agents in the same repo that do not have a repo-level `prompt` continue to use the installation-level instructions.
+- Installation-level custom instructions are appended to every built-in agent's system prompt as a shared prefix.
+- Custom agents defined in `customAgents` use their own `prompt` field and do not receive the installation-level instructions.
+- To add domain-specific review logic for a repo, define a `customAgents` entry with a targeted prompt.
 
 ## Examples for common stacks
 
@@ -48,35 +48,44 @@ Repo-level instructions **override** installation-level instructions. They do **
 
 ```yaml TypeScript / React
 version: 1
-agents:
-  - name: security
+customAgents:
+  - name: react-security
     prompt: "Flag any use of dangerouslySetInnerHTML. Check for XSS in user-facing components."
-  - name: style
+    severityDefault: critical
+  - name: react-style
     prompt: "Flag 'any' type usage — prefer explicit types. Require explicit return types on exported functions. Use 'const' over 'let' where possible."
-  - name: logic
+    severityDefault: warning
+  - name: react-logic
     prompt: "Watch for missing null checks on optional chaining results used in array methods."
+    severityDefault: warning
 ```
 
 ```yaml Django / Python
 version: 1
-agents:
-  - name: security
+customAgents:
+  - name: django-security
     prompt: "Flag SQL injection via raw() querysets. Check for CSRF exemptions, unvalidated redirects, and missing input sanitization."
-  - name: style
+    severityDefault: critical
+  - name: django-style
     prompt: "Enforce PEP 8. Flag any use of print() — use logging module instead. Require docstrings on public functions."
-  - name: logic
+    severityDefault: warning
+  - name: django-logic
     prompt: "Check for N+1 queries in views. Flag missing select_related/prefetch_related on QuerySet iterations."
+    severityDefault: warning
 ```
 
 ```yaml Monorepo
 version: 1
-agents:
-  - name: logic
+customAgents:
+  - name: service-boundaries
     prompt: "Flag cross-service-boundary imports. Services in services/* must not import from other services directly — use the shared/ directory."
-  - name: security
+    severityDefault: warning
+  - name: service-auth
     prompt: "Each service has its own auth middleware. Flag any request handler missing auth decoration."
-  - name: style
+    severityDefault: critical
+  - name: service-style
     prompt: "Each service owns its own DB models. Flag any model import that crosses service boundaries."
+    severityDefault: warning
 ```
 
 </CodeGroup>
@@ -87,11 +96,11 @@ Custom instructions have the following character limits:
 
 | Level | Limit |
 |---|---|
-| Installation-level | 1000 characters per agent |
-| Repo-level (`agents[].prompt`) | 1000 characters per agent |
+| Installation-level | 1000 characters |
+| Repo-level (`customAgents[].prompt`) | 1000 characters per agent |
 
 <Note>
-When no repo-level override is present, the installation-level instructions serve as a shared prefix appended to the built-in agent prompt. Keep them concise to leave room for the diff payload in the model's context window.
+Installation-level instructions serve as a shared prefix appended to every built-in agent prompt. Keep them concise to leave room for the diff payload in the model's context window.
 </Note>
 
 ## What makes a good custom instruction
@@ -123,7 +132,7 @@ Instructions under **200 characters** tend to produce the most focused results. 
 </AccordionGroup>
 
 <Tip>
-Start with one or two instructions per agent and observe the results in your first few reviews. Add more specificity only where the agent is missing issues or producing false positives.
+Start with one or two custom agents and observe the results in your first few reviews. Add more specificity only where the built-in agents are missing issues or producing false positives.
 </Tip>
 
 ## Next steps

@@ -13,7 +13,7 @@ MergeWatch follows the principle of least privilege. Every permission below is t
 | --- | --- | --- |
 | **Checks** | `read & write` | Create check runs on the pull request with a findings summary, risk rating, and pass/fail status. <img src="/images/repo.checks-permission.png" alt="Checks — Read and write" /> |
 | **Contents** | `read` | Read the pull request diff and the `.mergewatch.yml` configuration file from the repository root. MergeWatch never writes to repository contents. <img src="/images/repo.contents-permission.png" alt="Contents — Read-only" /> |
-| **Issues** | `read` | Create and update PR summary comments (GitHub's API uses the Issues endpoint for PR comments), list existing comments to avoid duplicates, and add reactions (e.g., :eyes: when a review starts). <img src="/images/repo.issues-permission.png" alt="Issues — Read-only" /> |
+| **Issues** | `read & write` | Create and update PR summary comments (GitHub's API uses the Issues endpoint for PR comments), list existing comments to avoid duplicates, and add reactions (e.g., :eyes: when a review starts). <img src="/images/repo.issues-permission.png" alt="Issues — Read and write" /> |
 | **Metadata** | `read` | Automatically granted to all GitHub Apps. Provides access to basic repository metadata (name, description, default branch). |
 | **Pull requests** | `read & write` | Post inline review findings as PR review comments, create and dismiss reviews, and read PR metadata and diffs. This is the primary output channel for every review. <img src="/images/repo.pr-permission.png" alt="Pull requests — Read and write" /> |
 

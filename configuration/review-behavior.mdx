@@ -19,14 +19,17 @@ MergeWatch triggers a review when it receives any of the following GitHub webhoo
 <Step title="pull_request.reopened">
   A previously closed pull request is reopened. MergeWatch treats this the same as a new PR and runs a fresh review.
 </Step>
+<Step title="pull_request.ready_for_review">
+  A draft pull request is marked as ready for review. MergeWatch treats this the same as a new PR and runs a fresh review.
+</Step>
 <Step title="issue_comment.created (manual trigger)">
   A comment is posted on a pull request mentioning `@mergewatch`. MergeWatch recognizes three mention commands:
 
   - `@mergewatch review` — triggers a full review (all agents)
   - `@mergewatch summary` — triggers a summary-only review (summary agent only)
-  - `@mergewatch` (any other mention) — responds to the user's comment contextually
+  - `@mergewatch` (any other mention) — triggers a **conversational response**. MergeWatch reads the PR diff and its previous review findings, then replies directly to the user's comment using the LLM. No review pipeline runs — the response is posted as a regular PR comment. Use this to ask questions about findings, request clarification, or discuss specific parts of the code.
 
-  All mentions are case-insensitive. This works even when `auto_review` is set to `false` in your configuration.
+  All mentions are case-insensitive. This works even when `autoReview` is set to `false` in your configuration.
 </Step>
 </Steps>
 
@@ -35,9 +38,9 @@ MergeWatch triggers a review when it receives any of the following GitHub webhoo
 
 MergeWatch deliberately skips reviews in the following situations:
 
-- **Draft PRs** — Skipped by default. Set `rules.skip_drafts: false` in your `.mergewatch.yml` to review drafts.
-- **All changed files match `ignore_patterns`** — If every file in the PR matches a pattern in `rules.ignore_patterns`, the entire PR is skipped.
-- **PR exceeds `rules.max_files` limit** — PRs with more changed files than the configured `max_files` value (default: 50) are skipped with a comment explaining why.
+- **Draft PRs** — Skipped by default. Set `rules.skipDrafts: false` in your `.mergewatch.yml` to review drafts.
+- **All changed files match `ignorePatterns`** — If every file in the PR matches a pattern in `rules.ignorePatterns`, the entire PR is skipped.
+- **PR exceeds `rules.maxFiles` limit** — PRs with more changed files than the configured `maxFiles` value (default: 50) are skipped with a comment explaining why.
 - **Repository is paused** — If MergeWatch is paused for the repository in the [dashboard](/dashboard/settings), no reviews run until it is resumed.
 </Warning>
 
@@ -78,7 +81,7 @@ To manually re-trigger a review, post a comment on the pull request:
 
 This works in all scenarios:
 
-- Even when `auto_review: false` is set in your configuration
+- Even when `autoReview: false` is set in your configuration
 - After a failed review to retry
 - After pushing new commits, if you do not want to wait for the automatic trigger
 - On PRs that were previously skipped (the skip rules are re-evaluated)
@@ -99,34 +102,16 @@ Each finding produced by MergeWatch includes a **confidence score** from 1 to 10
 
 | Range | Interpretation |
 |---|---|
-| 80-100 | High confidence — very likely a real issue |
-| 50-79 | Medium confidence — worth reviewing |
-| 1-49 | Low confidence — may be a false positive |
+| 90-100 | High confidence — obvious, clear-cut issue |
+| 75-89 | Medium-high confidence — likely a real issue |
+| 50-74 | Lower confidence — suppressed by the orchestrator |
+| 1-49 | Low confidence — suppressed by the orchestrator |
 
-By default, findings with confidence below **50** are suppressed. You can control this threshold with the `min_confidence` setting:
+The orchestrator automatically drops all findings with confidence below **75** during the dedup and ranking phase. This threshold is not user-configurable — it is designed to minimize false positives while surfacing real issues.
 
-```yaml .mergewatch.yml
-version: 1
-min_confidence: 50   # default — suppresses low-confidence findings
-```
-
-<AccordionGroup>
-<Accordion title="See all findings, including low-confidence">
-```yaml .mergewatch.yml
-version: 1
-min_confidence: 0
-```
-Set `min_confidence: 0` to see every finding regardless of confidence. Useful for auditing or tuning custom instructions.
-</Accordion>
-
-<Accordion title="Only show high-confidence findings">
-```yaml .mergewatch.yml
-version: 1
-min_confidence: 80
-```
-Reduces noise by only surfacing findings the agents are highly confident about.
-</Accordion>
-</AccordionGroup>
+<Tip>
+If you notice a legitimate issue being suppressed, consider adding a [custom agent](/configuration/mergewatch-yml#custom-agents) with a targeted prompt. Custom agents with focused prompts tend to produce higher-confidence findings for domain-specific concerns.
+</Tip>
 
 ## Next steps
 

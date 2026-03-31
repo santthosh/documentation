@@ -134,14 +134,14 @@ description: "Common MergeWatch problems with causes and fixes."
 ## "Skipped" on every PR
 
 <Accordion title="Skip rules in .mergewatch.yml are too broad">
-  The `ignore_patterns` configuration may be matching all files in the diff.
+  The `ignorePatterns` configuration may be matching all files in the diff.
 
   **Fix:** Review your `.mergewatch.yml` file:
 
   ```yaml
   # Example — this skips everything under docs/ and all lock files
   rules:
-    ignore_patterns:
+    ignorePatterns:
       - "docs/**"
       - "*.lock"
   ```
@@ -152,11 +152,11 @@ description: "Common MergeWatch problems with causes and fixes."
 <Accordion title="PR is a draft">
   Draft pull requests are skipped by default.
 
-  **Fix:** Either mark the PR as **Ready for review** or set `skip_drafts: false` in your `.mergewatch.yml`:
+  **Fix:** Either mark the PR as **Ready for review** or set `skipDrafts: false` in your `.mergewatch.yml`:
 
   ```yaml
   rules:
-    skip_drafts: false
+    skipDrafts: false
   ```
 </Accordion>
 
@@ -213,7 +213,7 @@ description: "Common MergeWatch problems with causes and fixes."
 
   ```yaml
   rules:
-    max_files: 50
+    maxFiles: 50
   ```
 
   Files beyond the limit are summarized rather than reviewed line-by-line.

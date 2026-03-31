@@ -307,8 +307,8 @@ MergeWatch maps merge-readiness scores to GitHub review events:
 | Merge score | GitHub review event | Effect |
 |---|---|---|
 | 4-5 | `APPROVE` | PR shows as approved by MergeWatch |
-| 2-3 | `COMMENT` | PR shows review comments without approval |
-| 1 | `REQUEST_CHANGES` | PR shows changes requested by MergeWatch |
+| 3 | `COMMENT` | PR shows review comments without approval |
+| 1-2 | `REQUEST_CHANGES` | PR shows changes requested by MergeWatch |
 
 This integrates with GitHub's required reviewers — if MergeWatch is a required reviewer, low scores can block merging.
 
