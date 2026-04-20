@@ -13,7 +13,7 @@ MergeWatch supports two deployment models. Each makes a different trade-off betw
 | **Storage** | Postgres (you manage) | DynamoDB (MergeWatch manages) |
 | **LLM provider** | Your choice (Anthropic, Bedrock, Ollama, LiteLLM) | Amazon Bedrock (MergeWatch account) |
 | **Code leaves your infra?** | No — all processing is local | Diff transits MergeWatch in-memory, not persisted |
-| **Billing** | Free (you pay your LLM provider only) | Free tier (20 PRs/month), then per-PR pricing |
+| **Billing** | Free (you pay your LLM provider only) | 5 free reviews (lifetime), then prepaid credits (≈$0.01–$0.10 per review) |
 | **AWS account required?** | No | No |
 | **Setup time** | ~15–30 min | ~5 min |
 | **Dashboard** | docker-compose second service | Next.js on Amplify (hosted by MergeWatch) |
@@ -103,7 +103,7 @@ You can start with SaaS and migrate to self-hosted later without losing your con
     Choose **Self-Hosted**. No data leaves your infrastructure. You control every component and can run fully offline with a local LLM.
   </Card>
   <Card title="No infrastructure team?" icon="cloud">
-    Choose **Managed SaaS**. Install the GitHub App and you are done. No cloud account, no Docker, no server management. First 20 PRs/month are free.
+    Choose **Managed SaaS**. Install the GitHub App and you are done. No cloud account, no Docker, no server management. First 5 reviews free, then pay-as-you-go.
   </Card>
 </CardGroup>
 

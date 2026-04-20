@@ -13,21 +13,20 @@ Set these environment variables in your `.env` file or container environment:
 | --- | --- | --- |
 | `LLM_PROVIDER` | Yes | `anthropic` |
 | `ANTHROPIC_API_KEY` | Yes | Your Anthropic API key |
-| `LLM_MODEL` | No | Override the default model |
+| `LLM_MODEL` | Yes | Anthropic model ID to use (e.g., `claude-sonnet-4-20250514`) |
 
-## Default model
+<Note>
+When `LLM_PROVIDER=anthropic`, you **must** set `LLM_MODEL` to an Anthropic-native model ID. The built-in defaults (`us.anthropic.claude-sonnet-4-20250514-v1:0` for the primary model and `us.anthropic.claude-haiku-4-5-20251001-v1:0` for the light model) are [Bedrock inference profile IDs](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles.html) and are not valid on the Anthropic API.
+</Note>
 
-MergeWatch uses **`claude-haiku-4-5-20251001`** (Claude 4.5 Haiku) by default. This model provides an excellent balance of speed, quality, and cost for code review tasks.
+## Model roles
 
-## Model override
+MergeWatch uses two model slots per review:
 
-To use a higher-capability model, set `LLM_MODEL` in your environment:
+- **Primary model** (`model` in `.mergewatch.yml`) — runs the agent pipeline (security, bugs, style, error handling, test coverage, comment accuracy). Use **Claude Sonnet 4** for the best review quality.
+- **Light model** (`lightModel` in `.mergewatch.yml`) — runs the summary and diagram passes. **Claude Haiku 4.5** is a good cost-optimized choice here.
 
-```bash
-LLM_MODEL=claude-sonnet-4-20250514
-```
-
-Sonnet produces more detailed reviews and catches subtler issues, at a higher per-token cost.
+Setting `LLM_MODEL` overrides **both** slots with the same model. For split primary/light models, configure them in `.mergewatch.yml` instead — see [mergewatch.yml reference](/configuration/mergewatch-yml).
 
 ## Example `.env` file
 
@@ -36,17 +35,20 @@ Sonnet produces more detailed reviews and catches subtler issues, at a higher pe
 LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
-# Optional: override the default model
-# LLM_MODEL=claude-sonnet-4-20250514
+# Pick a model — Sonnet for the highest review quality
+LLM_MODEL=claude-sonnet-4-20250514
 ```
+
+## Model suggestions
+
+| Anthropic model ID | Best for |
+| --- | --- |
+| `claude-sonnet-4-20250514` | Recommended. Highest review quality for deep agent analysis. |
+| `claude-haiku-4-5-20251001` | Cost-optimized. Faster and cheaper; good for summary/diagram. |
 
 ## Pricing
 
 You pay Anthropic directly for API usage. MergeWatch does not add any markup or proxy fees. See the [Anthropic pricing page](https://www.anthropic.com/pricing#702702) for current per-token rates.
-
-<Tip>
-Claude 4.5 Haiku is one of the most cost-effective models for code review. Most repositories see costs under $5/month with typical PR volumes.
-</Tip>
 
 ## Next steps
 

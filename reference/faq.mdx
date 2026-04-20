@@ -17,7 +17,7 @@ description: Frequently asked questions about MergeWatch.
     MergeWatch offers two ways to run:
 
     - **Self-hosted:** Clone the repo, configure a `.env` file, and run `docker compose up`. You control the entire stack — the server, database, dashboard, and LLM provider.
-    - **SaaS:** Use the hosted version at mergewatch.ai. No infrastructure to manage. First 20 PR reviews per month are free, then $0.35 per PR.
+    - **SaaS:** Use the hosted version at mergewatch.ai. No infrastructure to manage. The first 5 PR reviews are free (lifetime), then pay-as-you-go with prepaid credits. A typical review costs $0.01–$0.10.
   </Accordion>
 
   <Accordion title="Do I need an AWS account to self-host?">
@@ -40,7 +40,7 @@ description: Frequently asked questions about MergeWatch.
   </Accordion>
 
   <Accordion title="Is SaaS really free?">
-    The first 20 PR reviews per month are free with no credit card required. After that, each review costs a flat $0.35 per PR. You can set a monthly spend cap in the dashboard.
+    The first 5 PR reviews per installation are free with no credit card required. After that, MergeWatch uses a **prepaid credits** model — add a card, top up a balance, and each review deducts its actual cost. The formula is `llmCost + $0.005 infra fee + 40% margin`, which typically works out to $0.01–$0.10 per review. See [Billing & Pricing](/saas/billing) for details.
   </Accordion>
 
   <Accordion title="Do I need to host model weights or GPUs?">
@@ -60,8 +60,8 @@ description: Frequently asked questions about MergeWatch.
     - **SaaS:** Each PR that triggers a review counts. Skipped PRs (drafts, excluded paths) do not count.
   </Accordion>
 
-  <Accordion title="What happens when I hit 20 free PRs?">
-    Reviews continue at $0.35 per PR. There is no hard cutoff. If you want a spend cap, set one in the dashboard to pause reviews once the limit is reached.
+  <Accordion title="What happens when I use up my 5 free reviews?">
+    MergeWatch posts a GitHub Check Run with `action_required: credits required` on the next PR and opens a GitHub Issue titled *"MergeWatch: reviews paused — credits required"*. Add a payment method and top up via **Dashboard → Billing**; the next PR event will be reviewed and the blocking issue auto-closed.
   </Accordion>
 
   <Accordion title="Can I use MergeWatch on private repos?">
