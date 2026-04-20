@@ -4,8 +4,8 @@
   "name": "MergeWatch",
   "appearance": { "default": "dark" },
   "logo": {
-    "dark": "/logo/wordmark-fit.png",
-    "light": "/logo/wordmark-fit.png",
+    "dark": "/logo/wordmark.svg",
+    "light": "/logo/wordmark.svg",
     "href": "https://mergewatch.ai"
   },
   "favicon": "/favicon.svg",
