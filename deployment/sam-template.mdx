@@ -14,17 +14,18 @@ sam build && sam deploy
 ```
 
 <Note>
-The `npx mergewatch@latest init` wizard runs this automatically. You only need to invoke SAM directly if you are customizing the template or deploying manually. See [Install](/self-hosting/install) for the guided setup.
+The project uses a `scripts/deploy.sh` wrapper around `sam build && sam deploy` — invoke it with `pnpm run deploy:dev` / `deploy:staging` / `deploy` from the [mergewatch.ai repo](https://github.com/santthosh/mergewatch.ai). You only need to invoke SAM directly if you are customizing deployment flags.
 </Note>
 
 ## Parameters
 
-The template accepts three parameters that control the deployment:
+The template accepts four parameters that control the deployment:
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `Stage` | String | `prod` | Deployment stage (`prod`, `staging`, `dev`). Scopes all resource names so multiple environments can coexist in the same AWS account. |
+| `Stage` | String | `prod` | Deployment stage (`dev`, `staging`, `prod`). Scopes all resource names so multiple environments can coexist in the same AWS account. |
 | `DefaultBedrockModelId` | String | `us.anthropic.claude-sonnet-4-20250514-v1:0` | Default Bedrock model used by all agents. Can be overridden per-repo via `.mergewatch.yml`. |
+| `DeploymentMode` | String | `self-hosted` | Deployment mode. Set to `saas` to enable Stripe billing enforcement in the ReviewAgent and deploy the BillingHandler Lambda. `self-hosted` skips all billing checks. |
 | `DashboardBaseUrl` | String | `https://mergewatch.ai` | Base URL used in PR comment links that point back to the MergeWatch dashboard. |
 
 <Tip>
@@ -122,6 +123,7 @@ capabilities = "CAPABILITY_IAM"
 parameter_overrides = [
   "Stage=prod",
   "DefaultBedrockModelId=us.anthropic.claude-sonnet-4-20250514-v1:0",
+  "DeploymentMode=saas",
   "DashboardBaseUrl=https://mergewatch.example.com"
 ]
 ```
@@ -132,6 +134,7 @@ sam deploy \
   --parameter-overrides \
     Stage=staging \
     DefaultBedrockModelId=us.anthropic.claude-sonnet-4-20250514-v1:0 \
+    DeploymentMode=self-hosted \
     DashboardBaseUrl=https://staging.mergewatch.example.com
 ```
 

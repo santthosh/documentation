@@ -77,10 +77,11 @@ flowchart LR
 
 ### Self-Hosted Stack
 
-MergeWatch self-hosted runs as a Docker container with a Postgres sidecar:
+MergeWatch self-hosted runs as three Docker containers from a single `docker-compose.yml`:
 
-- **Express server** — receives GitHub webhooks, runs the review pipeline
-- **PostgreSQL** — review state, repo config, installation data
+- **Express server** — port **3000**, receives GitHub webhooks and runs the review pipeline
+- **Next.js dashboard** — port **3001**, browser UI for reviews, repos, and settings
+- **PostgreSQL 16** — review state, repo config, installation data
 - **Your LLM provider** — Anthropic (default), LiteLLM (100+ providers), Amazon Bedrock, or Ollama
 
 No AWS account required (unless you choose Bedrock as your LLM provider).

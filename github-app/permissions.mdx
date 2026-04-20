@@ -45,16 +45,16 @@ Equally important is what the app *cannot* do. These permissions are intentional
 
 ## Webhook events
 
-MergeWatch subscribes to the following webhook events. Each event triggers a specific, scoped action.
+MergeWatch subscribes to the following webhook events. Each event triggers a specific, scoped action. All other events are acknowledged with `200 OK` and ignored.
 
 | Event | Why it's subscribed |
 | --- | --- |
-| `pull_request` | Triggers the review pipeline when a PR is opened, synchronized (new commits pushed), or reopened. |
-| `pull_request_review` | Tracks when reviews are submitted, edited, or dismissed on a PR. Used to detect stale MergeWatch reviews that need to be replaced. |
-| `pull_request_review_comment` | Tracks individual review comments on PR diffs. Used to monitor threaded discussions on MergeWatch findings. |
-| `pull_request_review_thread` | Tracks when review comment threads are resolved or unresolved. Allows MergeWatch to track whether findings have been addressed. |
-| `issue_comment` | Listens for commands in PR comments (e.g., `@mergewatch review` to re-trigger a review). |
-| `installation` | Tracks when the app is installed or uninstalled so MergeWatch can provision or clean up repository records. |
+| `pull_request` | Triggers the review pipeline on `opened`, `synchronize`, `ready_for_review`, and `reopened`. |
+| `issue_comment` | Listens for `@mergewatch` mentions in PR comments (`@mergewatch review`, `@mergewatch summary`, or free-form respond mode). |
+| `pull_request_review_comment` | Detects when a human replies inside a review-comment thread that MergeWatch started, so the bot can reply inline. Only `created` actions with an `in_reply_to_id` are handled. |
+| `installation` | Tracks when the app is installed or uninstalled so MergeWatch can provision or clean up installation records. |
+
+See [Webhook Events](/github-app/webhook-events) for the exact action-level handling per event.
 
 <Frame caption="Webhook event subscriptions — the checked events are the ones MergeWatch requires.">
   <img src="/images/subscribe-to-events.png" alt="GitHub App webhook event subscriptions" />

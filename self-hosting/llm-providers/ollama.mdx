@@ -22,16 +22,22 @@ Set these environment variables in your `.env` file or container environment:
 | Variable | Required | Value |
 | --- | --- | --- |
 | `LLM_PROVIDER` | Yes | `ollama` |
+| `LLM_MODEL` | Yes | Ollama model tag (e.g., `qwen2.5-coder:7b`, `llama3`). The Ollama provider has no built-in default — you must pick a model that you've pulled into the Ollama server. |
 | `OLLAMA_BASE_URL` | No | Ollama API endpoint (default: `http://localhost:11434`) |
-| `LLM_MODEL` | No | Override the default model |
 
-## Default model
+## Picking a model
 
-MergeWatch uses **`qwen2.5-coder:7b`** by default. This model runs on GPUs with **8 GB VRAM** and provides reasonable code understanding for its size.
+You must set `LLM_MODEL` to a model tag that you've pulled into your Ollama server. There is no built-in default. Suggested starting points:
+
+| Model | Best for | Approx VRAM |
+| --- | --- | --- |
+| `qwen2.5-coder:7b` | Code-focused reviews on an 8 GB GPU | ~6–8 GB |
+| `qwen2.5-coder:14b` | Better review quality if you have 16 GB VRAM | ~12–16 GB |
+| `llama3` | General-purpose baseline for quick smoke tests | ~4–8 GB |
 
 ## Setup
 
-Pull the model before starting MergeWatch:
+Pull the model before starting MergeWatch — MergeWatch will not pull it for you:
 
 ```bash
 ollama pull qwen2.5-coder:7b
@@ -56,6 +62,7 @@ services:
     env_file: .env
     environment:
       LLM_PROVIDER: ollama
+      LLM_MODEL: qwen2.5-coder:7b
       OLLAMA_BASE_URL: http://ollama:11434
     depends_on:
       - ollama

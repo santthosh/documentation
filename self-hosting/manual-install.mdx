@@ -112,14 +112,17 @@ For most users, the recommended path is Docker Compose. See the [install guide](
     docker run -d \
       --name dashboard \
       --network mergewatch-net \
-      -e NEXT_PUBLIC_API_URL=http://mergewatch:3000 \
+      -e DEPLOYMENT_MODE=self-hosted \
+      -e DATABASE_URL=postgres://postgres:postgres@postgres:5432/mergewatch \
       -e GITHUB_CLIENT_ID=your_client_id \
       -e GITHUB_CLIENT_SECRET=your_client_secret \
       -e NEXTAUTH_SECRET=$(openssl rand -base64 32) \
       -e NEXTAUTH_URL=http://localhost:3001 \
       -p 3001:3001 \
-      ghcr.io/santthosh/mergewatch-dashboard:latest
+      ghcr.io/santthosh/mergewatch-dashboard:0.1.0
     ```
+
+    The dashboard reads directly from the MergeWatch Postgres database, so no `NEXT_PUBLIC_API_URL` is required.
   </Step>
 
   <Step title="Update the GitHub App webhook URL">

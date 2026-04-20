@@ -3,7 +3,7 @@ title: "Dashboard Overview"
 description: "Monitor reviews, manage repositories, and configure MergeWatch from the dashboard."
 ---
 
-The MergeWatch dashboard is a Next.js application that provides review history, repository management, and configuration. For self-hosted deployments, it deploys alongside the SAM stack. SaaS users access it at [mergewatch.ai](https://mergewatch.ai).
+The MergeWatch dashboard is a Next.js application that provides review history, repository management, and configuration. For self-hosted deployments, it runs as a second container in `docker-compose.yml` on port **3001** (the Express API server listens on 3000). SaaS users access the hosted dashboard at [mergewatch.ai](https://mergewatch.ai).
 
 <Frame caption="MergeWatch dashboard — home page with monitored repositories and recent reviews.">
   <img src="/images/dashboard.png" alt="MergeWatch dashboard" />
