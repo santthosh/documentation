@@ -78,7 +78,8 @@
               "configuration/mergewatch-yml",
               "configuration/review-behavior",
               "configuration/skip-rules",
-              "configuration/custom-instructions"
+              "configuration/custom-instructions",
+              "configuration/conventions"
             ]
           },
           {

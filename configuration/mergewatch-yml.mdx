@@ -113,6 +113,7 @@ ux:
 | `maxFileRequestRounds` | `number` | `1` | Maximum rounds of file fetching per agent (1--2). Each round lets the agent request more files based on what it learned. |
 | `maxContextKB` | `number` | `256` | Maximum total context size in KB for fetched files per agent. Prevents runaway context expansion. |
 | `customStyleRules` | `string[]` | `[]` | Additional style rules applied to the style agent. Each entry is a rule string. |
+| `conventions` | `string` | auto-discovered | Path to a Markdown file documenting repo-specific conventions. Injected into every agent's prompt (16 KB cap). When unset, MergeWatch tries `AGENTS.md`, `CONVENTIONS.md`, and `.mergewatch/conventions.md` in that order. See [Repository Conventions](/configuration/conventions). |
 | `excludePatterns` | `string[]` | `[]` | File patterns to exclude from the diff sent to agents (in addition to `ignorePatterns` in `rules`). Uses glob syntax. |
 | `agents` | `object` | See [Agents](#agents) | Boolean map of built-in agent names to enabled/disabled state. |
 | `customAgents` | `CustomAgent[]` | `[]` | List of custom agent definitions. See [Custom agents](#custom-agents). |
@@ -149,7 +150,7 @@ To define entirely new agents with custom prompts, use the `customAgents` array.
 | `errorHandling` | Enabled | Empty catch blocks, swallowed errors, unhandled promise rejections |
 | `testCoverage` | Enabled | Missing tests for new public functions, untested edge cases |
 | `commentAccuracy` | Enabled | Misleading or outdated code comments, incorrect JSDoc |
-| `summary` | Enabled | High-level PR summary with risk rating (uses the light model) |
+| `summary` | Enabled | High-level PR summary with the merge readiness score (uses the light model) |
 | `diagram` | Enabled | Mermaid diagram of the changed control flow (uses the light model) |
 
 ### Custom agents
