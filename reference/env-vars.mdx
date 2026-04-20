@@ -24,7 +24,8 @@ Self-hosted deployments use a `.env` file alongside `docker-compose.yml`. See th
 | `PORT` | No | `3000` | Port the MergeWatch server listens on inside the container |
 | `GITHUB_APP_SLUG` | No | — | GitHub App slug, used to generate the installation link |
 | `GITHUB_PRIVATE_KEY_FILE` | No | — | Path to PEM file — alternative to inline `GITHUB_PRIVATE_KEY` |
-| `DASHBOARD_URL` | No | — | Public URL of the dashboard (e.g., `https://dashboard.example.com`) |
+| `DASHBOARD_BASE_URL` | No | — | Public base URL of the dashboard (e.g., `https://dashboard.example.com`). Read by the server to generate deep links in PR comments. |
+| `DASHBOARD_URL` | No | `http://localhost:3001` | Consumed by `docker-compose.yml` to set `NEXTAUTH_URL` on the dashboard container. Set when serving the dashboard on a public domain. |
 
 ### Provider-specific: Anthropic
 
@@ -59,13 +60,15 @@ If you run MergeWatch on an EC2 instance or ECS task with an IAM instance profil
 
 ### Dashboard (Self-Hosted)
 
+The dashboard container runs on port **3001** (the Express server uses 3000). These variables are set on the `dashboard` service in `docker-compose.yml`.
+
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `GITHUB_CLIENT_ID` | Yes | — | GitHub OAuth App client ID for dashboard login |
-| `GITHUB_CLIENT_SECRET` | Yes | — | GitHub OAuth App client secret |
+| `GITHUB_CLIENT_ID` | Yes | — | OAuth client ID from your GitHub App's **OAuth Credentials** section |
+| `GITHUB_CLIENT_SECRET` | Yes | — | OAuth client secret from your GitHub App |
 | `NEXTAUTH_SECRET` | Yes | — | Random secret for session signing (generate with `openssl rand -base64 32`) |
-| `NEXTAUTH_URL` | No | — | Public URL of the dashboard (used by NextAuth for callbacks) |
-| `NEXT_PUBLIC_API_URL` | No | — | URL of the MergeWatch API server (e.g., `http://localhost:3000`) |
+| `NEXTAUTH_URL` | No | `http://localhost:3001` | Public URL the dashboard is served from. Docker Compose sets this from `DASHBOARD_URL`. |
+| `DEPLOYMENT_MODE` | No | `self-hosted` | Set to `saas` to enable the billing UI. |
 
 ---
 

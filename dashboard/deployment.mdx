@@ -21,15 +21,21 @@ The MergeWatch dashboard is a Next.js application that provides a web UI for man
 
     ```yaml docker-compose.yml
     dashboard:
-      image: ghcr.io/santthosh/mergewatch-dashboard:latest
-      ports:
-        - "3001:3001"
+      image: ghcr.io/santthosh/mergewatch-dashboard:0.1.0
+      restart: unless-stopped
       environment:
-        NEXT_PUBLIC_API_URL: http://mergewatch:3000
+        DEPLOYMENT_MODE: self-hosted
+        DATABASE_URL: postgres://postgres:postgres@db:5432/mergewatch
+        NEXTAUTH_URL: ${DASHBOARD_URL:-http://localhost:3001}
+        NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
         GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
         GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+        PORT: "3001"
+      ports:
+        - "3001:3001"
       depends_on:
-        - mergewatch
+        mergewatch:
+          condition: service_healthy
     ```
 
     ### Environment variables
@@ -38,11 +44,14 @@ The MergeWatch dashboard is a Next.js application that provides a web UI for man
 
     | Variable | Required | Description |
     | --- | --- | --- |
-    | `GITHUB_CLIENT_ID` | Yes | GitHub App's OAuth Client ID |
-    | `GITHUB_CLIENT_SECRET` | Yes | GitHub App's OAuth Client Secret |
-    | `NEXT_PUBLIC_API_URL` | Yes | URL of the MergeWatch server (use the Docker service name, e.g. `http://mergewatch:3000`) |
+    | `GITHUB_CLIENT_ID` | Yes | OAuth client ID from your GitHub App's **OAuth Credentials** section (same App, not a separate OAuth App) |
+    | `GITHUB_CLIENT_SECRET` | Yes | OAuth client secret from your GitHub App |
     | `NEXTAUTH_SECRET` | Yes | Random secret for NextAuth session signing. Generate with `openssl rand -base64 32` |
-    | `NEXTAUTH_URL` | Yes | Public URL of the dashboard, e.g. `http://localhost:3001` |
+    | `DASHBOARD_URL` | No | Public URL of the dashboard. Docker Compose wires this into `NEXTAUTH_URL`. Defaults to `http://localhost:3001`. |
+
+    <Note>
+    The dashboard reads from the MergeWatch Postgres database directly via `DATABASE_URL` — there is no HTTP call from the dashboard to the Express server, so no `NEXT_PUBLIC_API_URL` is required.
+    </Note>
 
     ### Start the dashboard
 
@@ -90,24 +99,20 @@ The MergeWatch dashboard is a Next.js application that provides a web UI for man
 
     | Variable | Description | Where to find it |
     | --- | --- | --- |
-    | `GITHUB_ID` | GitHub App's OAuth Client ID | GitHub App settings > Client ID |
-    | `GITHUB_SECRET` | GitHub App's OAuth Client Secret | GitHub App settings > Client Secrets |
+    | `GITHUB_CLIENT_ID` | GitHub App's OAuth Client ID | GitHub App settings > OAuth Credentials |
+    | `GITHUB_CLIENT_SECRET` | GitHub App's OAuth Client Secret | GitHub App settings > OAuth Credentials |
     | `NEXTAUTH_SECRET` | Random secret for NextAuth session signing | Generate: `openssl rand -base64 32` |
     | `NEXTAUTH_URL` | Full URL of your deployed dashboard | Your Amplify app URL |
 
-    #### Required — Backend connection
+    #### Required — SaaS billing wiring
 
     | Variable | Description | Where to find it |
     | --- | --- | --- |
-    | `NEXT_PUBLIC_API_URL` | API Gateway base URL | SaaS stack output: `ApiGatewayUrl` |
+    | `DEPLOYMENT_MODE` | Set to `saas` to enable the billing UI | Amplify env var |
+    | `BILLING_API_URL` | Base URL of the BillingHandler Lambda | SAM stack output: `BillingUrl` |
+    | `BILLING_API_SECRET` | Shared secret for dashboard → BillingHandler auth | SSM: `/mergewatch/{stage}/billing-api-secret` |
     | `GITHUB_APP_ID` | GitHub App ID | GitHub App settings |
     | `GITHUB_APP_SLUG` | GitHub App slug (used to build install URLs) | GitHub App settings |
-
-    #### Optional — Feature flags
-
-    | Variable | Description | Default |
-    | --- | --- | --- |
-    | `NEXT_PUBLIC_ENABLE_BILLING` | Show billing/usage UI | `false` |
 
     ### Deployment steps
 
@@ -227,22 +232,24 @@ Session expiry defaults to 30 days.
 
 ## Connecting dashboard to backend
 
-The dashboard calls your MergeWatch backend API. All API calls are authenticated using the user's GitHub session — the backend validates the GitHub token on each request.
+The dashboard's Next.js API routes read from the same data store the webhook pipeline writes to — Postgres in self-hosted mode and DynamoDB in SaaS mode. There is **no HTTP call** from the dashboard to the Express/Lambda webhook server, so no public API URL environment variable is required.
 
 ```mermaid
 sequenceDiagram
-    participant Dash as Dashboard
-    participant API as MergeWatch API
+    participant User
+    participant Dash as Dashboard (Next.js)
+    participant Store as Postgres / DynamoDB
     participant GH as GitHub API
 
-    Dash->>API: GET /api/reviews?installation_id=123<br/>Authorization: Bearer {token}
-    API->>GH: GET /user (validate token)
-    GH-->>API: User profile + installations
-    API->>API: Confirm user has access to installation 123
-    API-->>Dash: Review data (JSON)
+    User->>Dash: Open /dashboard/reviews
+    Dash->>GH: GET /user/installations<br/>(validates OAuth token)
+    GH-->>Dash: Installation list
+    Dash->>Store: Query reviews scoped to installation_id
+    Store-->>Dash: Review data
+    Dash-->>User: Render reviews page
 ```
 
-Set `NEXT_PUBLIC_API_URL` to point at your MergeWatch server. For self-hosted, this is the Docker service name (e.g. `http://mergewatch:3000`). For SaaS, this is your API Gateway URL.
+Access control lives in each `/api/*` route: it validates the NextAuth session, calls the GitHub API with the user's OAuth token to confirm installation access, then reads/writes the store.
 
 ---
 
@@ -259,7 +266,7 @@ The `NEXTAUTH_SECRET` or `NEXTAUTH_URL` environment variables are missing or inc
 </Accordion>
 
 <Accordion title="Blank dashboard after sign-in">
-`NEXT_PUBLIC_API_URL` is missing or pointing to the wrong backend URL. For self-hosted, verify the MergeWatch server container is running. For SaaS, check the API Gateway URL.
+The dashboard cannot reach its data store. For self-hosted, verify `DATABASE_URL` resolves inside the container (the `db` service must be healthy — `docker compose ps` should show it as `healthy`). For SaaS, confirm the dashboard's IAM role can read the MergeWatch DynamoDB tables.
 </Accordion>
 
 <Accordion title="GitHub returns 'redirect_uri_mismatch'">

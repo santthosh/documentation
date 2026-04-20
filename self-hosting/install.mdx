@@ -28,27 +28,45 @@ cd mergewatch.ai
 cp .env.example .env
 ```
 
-Edit `.env` and fill in the four required variables:
+Edit `.env` and fill in the required variables:
 
 ```bash
-# Required
+# ── GitHub App (required) ──────────────────────────────────────────────
 GITHUB_APP_ID=123456
 GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
 GITHUB_WEBHOOK_SECRET=your-webhook-secret
+
+# ── GitHub OAuth (required for dashboard) ──────────────────────────────
+# Found under: GitHub App Settings → OAuth Credentials (same App, not a separate OAuth App)
+GITHUB_CLIENT_ID=Iv23ab...
+GITHUB_CLIENT_SECRET=your-oauth-client-secret
+
+# ── Dashboard auth (required for dashboard) ────────────────────────────
+# Generate with: openssl rand -base64 32
+NEXTAUTH_SECRET=random-32-byte-secret
+
+# ── LLM Provider (pick one — Anthropic is the default) ─────────────────
+LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
+LLM_MODEL=claude-sonnet-4-20250514
 
 # Handled by docker-compose — no changes needed
-# DATABASE_URL=postgresql://mergewatch:mergewatch@postgres:5432/mergewatch
+# DATABASE_URL=postgres://postgres:postgres@db:5432/mergewatch
 # PORT=3000
 ```
 
 | Variable | Required | Description |
 |---|---|---|
 | `GITHUB_APP_ID` | Yes | The numeric ID of your GitHub App |
-| `GITHUB_PRIVATE_KEY` | Yes | RSA private key for authenticating as the GitHub App |
+| `GITHUB_PRIVATE_KEY` | Yes | RSA private key for authenticating as the GitHub App (or use `GITHUB_PRIVATE_KEY_FILE` to point to a `.pem` file) |
 | `GITHUB_WEBHOOK_SECRET` | Yes | HMAC secret for validating webhook payloads |
-| `ANTHROPIC_API_KEY` | Yes | API key from [console.anthropic.com](https://console.anthropic.com) |
+| `GITHUB_CLIENT_ID` | Yes | OAuth client ID from your GitHub App (used by the dashboard for sign-in) |
+| `GITHUB_CLIENT_SECRET` | Yes | OAuth client secret from your GitHub App |
+| `NEXTAUTH_SECRET` | Yes | Random 32-byte secret for signing dashboard sessions (generate with `openssl rand -base64 32`) |
+| `ANTHROPIC_API_KEY` | If `LLM_PROVIDER=anthropic` | API key from [console.anthropic.com](https://console.anthropic.com) |
 | `LLM_PROVIDER` | No | Default: `anthropic`. Options: `anthropic`, `litellm`, `bedrock`, `ollama` |
+| `LLM_MODEL` | Yes for `anthropic` / `litellm` / `ollama` | Model ID. For Anthropic, use a native model ID like `claude-sonnet-4-20250514` — the built-in defaults are Bedrock inference profile IDs and only work for `LLM_PROVIDER=bedrock`. |
+| `DASHBOARD_URL` | No | Public URL of the dashboard (e.g., `https://dashboard.example.com`). Used as the `NEXTAUTH_URL` for session callbacks. Defaults to `http://localhost:3001`. |
 | `DATABASE_URL` | No | Set automatically by docker-compose (Postgres sidecar) |
 | `PORT` | No | Default: `3000` |
 
@@ -64,9 +82,10 @@ To use a different LLM provider, set `LLM_PROVIDER` and the provider-specific va
 docker compose up -d
 ```
 
-This starts two containers:
-- **mergewatch** — the Express server on port 3000
-- **postgres** — PostgreSQL database
+This starts three containers:
+- **mergewatch** — the Express server on port **3000** (handles GitHub webhooks)
+- **dashboard** — the Next.js dashboard on port **3001** (browser UI)
+- **db** — PostgreSQL 16 database
 
 Database migrations run automatically on first startup.
 
@@ -87,7 +106,7 @@ Server listening on port 3000
 ```
 
 <Warning>
-If the server fails to start, check that your `.env` file has all four required variables set correctly. See [Troubleshooting](/reference/troubleshooting) for common issues.
+If the server fails to start, check that your `.env` file has all required variables set correctly (`GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `NEXTAUTH_SECRET`, and your LLM provider key). See [Troubleshooting](/reference/troubleshooting) for common issues.
 </Warning>
 
 </Step>
@@ -139,12 +158,12 @@ Open a pull request against any installed repository. MergeWatch picks it up aut
 
 - The Express server receives the `pull_request.opened` webhook event
 - The review pipeline fetches the diff and sends it to your LLM provider
-- A review comment appears on the pull request within **1--3 minutes**
+- A review comment appears on the pull request within **15--50 seconds** (typical range; larger diffs and cold starts take longer)
 
 The review includes:
 - A summary of the changes
-- File-by-file findings posted as inline review comments
-- A risk rating (low, medium, high)
+- File-by-file findings posted as inline review comments on changed lines
+- A **1–5 merge readiness score** indicating how safe the PR is to merge
 
 ## Next steps
 
