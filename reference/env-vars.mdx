@@ -77,18 +77,33 @@ These variables are used internally by the MergeWatch SaaS infrastructure. They 
 
 The SaaS deployment runs on AWS Lambda and does not use `LLM_PROVIDER`, `DATABASE_URL`, or any of the self-hosted provider variables. Bedrock access is handled via the Lambda execution role.
 
+### Core Lambda
+
 | Variable | Description |
 | --- | --- |
-| `DEPLOYMENT_MODE` | Always set to `saas` |
+| `DEPLOYMENT_MODE` | Deployment mode — `saas` or `self-hosted`. Gates billing and SaaS-only code paths. |
 | `INSTALLATIONS_TABLE` | DynamoDB table name for GitHub App installations |
 | `REVIEWS_TABLE` | DynamoDB table name for review records |
-| `STRIPE_SECRET_KEY` | Stripe API secret key for billing |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `STRIPE_PRICE_ID` | Stripe Price ID for the per-PR pricing plan |
+| `REVIEW_AGENT_FUNCTION_NAME` | Name of the ReviewAgent Lambda (the WebhookHandler invokes it async) |
+| `DEFAULT_BEDROCK_MODEL_ID` | Bedrock model used by the review agents (SAM parameter) |
 
-<Info>
-Stripe billing integration is planned but not yet active. These variables are reserved for future use.
-</Info>
+### Billing Lambda (Stripe)
+
+Configured when `DeploymentMode=saas`. Credentials are pulled from SSM at deploy time — see [BILLING_SETUP.md](https://github.com/santthosh/mergewatch.ai/blob/main/BILLING_SETUP.md) for details.
+
+| Variable | Description |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Stripe API secret key (from `/mergewatch/{stage}/stripe-secret-key`) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (from `/mergewatch/{stage}/stripe-webhook-secret`) |
+| `BILLING_API_SECRET` | Shared secret for dashboard → BillingHandler auth (from `/mergewatch/{stage}/billing-api-secret`) |
+
+### Dashboard (Amplify) env vars for SaaS mode
+
+| Variable | Description |
+| --- | --- |
+| `DEPLOYMENT_MODE` | `saas` — toggles the billing UI in the dashboard |
+| `BILLING_API_URL` | `BillingUrl` from SAM stack outputs (e.g., `https://…/dev/billing`) |
+| `BILLING_API_SECRET` | Same value as above, read from SSM and set in Amplify |
 
 ---
 
@@ -98,7 +113,7 @@ Stripe billing integration is planned but not yet active. These variables are re
   <Card title="Install Guide" icon="download" href="/self-hosting/install">
     Set up MergeWatch with Docker Compose.
   </Card>
-  <Card title="CLI Reference" icon="terminal" href="/reference/cli">
-    Manage your SaaS deployment with the CLI.
+  <Card title="Commands Reference" icon="terminal" href="/reference/cli">
+    Manage your deployment with Docker and repo scripts.
   </Card>
 </CardGroup>

@@ -1,60 +1,84 @@
 ---
 title: "Billing & Pricing"
-description: "MergeWatch SaaS pricing — free tier, per-PR pricing, and spend caps."
+description: "MergeWatch SaaS pricing — a 5-review free tier, pay-as-you-go credits, auto-reload, and a transparent per-review cost formula."
 ---
 
-<Info>
-**Preview period — all reviews are free.** Billing integration is coming soon. During the preview period, all PR reviews are free with no usage limits. The pricing structure below reflects planned pricing that will take effect once billing is enabled. We will notify all users before the transition.
-</Info>
-
-MergeWatch SaaS charges per pull request reviewed. There are no per-seat fees — ever. Your entire team uses MergeWatch under a single billing account tied to your GitHub organization or user account.
+MergeWatch SaaS uses a **prepaid credits** model. After a free tier, you load a balance with a card (via Stripe), and each review deducts its actual cost from that balance. No subscriptions, no per-seat fees, no volume contracts.
 
 ## Free tier
 
-Every account gets **20 free PR reviews per month**. No credit card is required to start. The free tier resets on the first of each calendar month (UTC).
-
-## Planned pricing tiers
-
-The following volume-based pricing will take effect once billing is enabled. The more PRs you review in a billing month, the lower your per-PR cost:
-
-| Monthly volume | Price per PR |
-|---|---|
-| 1 – 20 | **Free** |
-| 21 – 500 | $0.35 |
-| 501 – 2,000 | $0.25 |
-| 2,001+ | $0.18 |
+Every installation gets **5 free PR reviews** total (lifetime, not per month). No credit card is required to start. The free counter is tracked per GitHub App installation — once you've used all 5, you'll need to add a payment method to continue.
 
 <Tip>
-Tiers are cumulative within a billing month. If you review 600 PRs, the first 20 are free, PRs 21–500 are billed at $0.35 each, and PRs 501–600 are billed at $0.25 each.
+The free tier is intended to let you evaluate MergeWatch on real PRs. If you reach the limit and want to keep going, add a card via **Dashboard → Billing**.
 </Tip>
+
+## Per-review pricing
+
+Each review is priced transparently from the actual LLM cost. There are no tiers or commitments.
+
+```
+total = llmCost + $0.005 infra fee + (llmCost × 40% margin)
+```
+
+**Example.** A review that costs $0.02 in LLM tokens:
+
+```
+$0.02 + $0.005 + ($0.02 × 0.40) = $0.033
+```
+
+A typical small-to-medium PR review lands between **$0.01 and $0.10**, depending on diff size, number of agents enabled, and whether codebase-awareness triggers file fetches.
+
+<Info>
+The minimum balance required to start a paid review is **$0.05**. If your balance drops below that, MergeWatch pauses reviews until you top up or auto-reload fires.
+</Info>
+
+## Topping up
+
+Add credits from **Dashboard → Billing**:
+
+1. Click **Add payment method** → complete Stripe Checkout to save a card.
+2. Pick a top-up amount: **$10**, **$25**, **$50**, or **$100**.
+3. Credits post instantly. The balance appears in the dashboard header.
+
+### Auto-reload
+
+Enable auto-reload to avoid interruptions. When your balance drops below the configured threshold (default **$1**), MergeWatch charges your saved card for the configured top-up amount.
+
+Configure it in **Dashboard → Billing → Auto-reload**:
+- Toggle auto-reload on/off
+- Set the threshold (e.g., $5)
+- Set the top-up amount (e.g., $25)
+
+<Tip>
+Auto-reload uses a DynamoDB mutex to guarantee it fires at most once per drop below the threshold — you won't see double charges on rapid back-to-back reviews.
+</Tip>
+
+## What counts as a billable review
+
+A **billable review** is any review that completes and posts a comment. Specifically:
+
+- Each `pull_request` event (opened, synchronize, ready_for_review) that runs to completion counts as one review.
+- PRs **skipped** by a skip rule in your `.mergewatch.yml` (draft PRs, ignored labels, oversized diffs, matched ignore patterns) do **not** count.
+- Each push to a PR re-runs the review on the updated diff and counts as a separate review.
+- `@mergewatch` mentions in PR comments that trigger a re-review also count.
+
+## What happens when your balance runs out
+
+If a review is dispatched and your balance is below the minimum:
+
+1. MergeWatch posts a **GitHub Check Run** with `action_required: credits required` on the PR.
+2. A **GitHub Issue** is filed in the repository: *"MergeWatch: reviews paused — credits required"*.
+3. No review comment is posted. Existing comments on prior PRs remain untouched.
+4. Once you add credits, the next PR event is reviewed normally and the blocking issue is auto-closed.
 
 ## No per-seat fees
 
-MergeWatch does not charge per user, per seat, or per repository. A single billing account covers everyone in your GitHub organization. Add as many developers and repos as you want — pricing is based solely on the number of PR reviews.
-
-## What counts as a PR
-
-A **billable PR** is any pull request that triggers a MergeWatch review. Specifically:
-
-- Each `pull_request` event (opened, synchronize) that results in a completed review counts as one PR.
-- If a PR is **skipped** because of a skip rule in your `.mergewatch.yml` (e.g., draft PRs, specific file paths, or label-based exclusions), it does **not** count toward your usage.
-- Multiple pushes to the same PR each count as a separate review, since MergeWatch re-analyzes the updated diff each time.
-
-## Spend cap
-
-You can set an optional **hard monthly spend cap** in the MergeWatch dashboard under **Settings > Billing**. When your spend reaches the cap:
-
-- MergeWatch stops reviewing new PRs for the remainder of the billing month.
-- Existing reviews and comments remain on your PRs.
-- You receive an email notification when you reach 80% and 100% of your cap.
-
-<Warning>
-Once the spend cap is hit, no new reviews will be posted until the next billing month or until you raise the cap. Make sure your cap accommodates your expected PR volume.
-</Warning>
+MergeWatch never charges per user, per seat, or per repository. A single billing account covers everyone in your GitHub organization. Add as many developers and repos as you want — billing is based solely on review cost.
 
 ## Self-hosted is always free
 
-If you self-host MergeWatch, there is no MergeWatch fee. You pay only your LLM provider (Anthropic API, Amazon Bedrock, Ollama, or any provider supported via LiteLLM). See [Self-Hosting Overview](/self-hosting/overview) for details.
+If you self-host MergeWatch, there is no MergeWatch fee. You pay only your LLM provider (Anthropic API, Amazon Bedrock, Ollama, or any provider supported via LiteLLM). See [Self-Hosting Overview](/self-hosting/overview).
 
 ## Next steps
 

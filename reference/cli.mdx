@@ -1,15 +1,15 @@
 ---
-title: "CLI Reference"
-description: "CLI commands for MergeWatch SaaS management, plus Docker commands for self-hosted deployments."
+title: "Commands Reference"
+description: "Commands for managing MergeWatch: Docker Compose for self-hosted, pnpm and SAM CLI for SaaS stack deployments."
 ---
 
-<Warning>
-The MergeWatch CLI (`npx mergewatch@latest`) is for **SaaS deployments only**. Self-hosted users do not use the CLI — installation is done by cloning the repository, configuring a `.env` file, and running `docker compose up`. See the [self-hosted install guide](/self-hosting/install).
-</Warning>
+<Info>
+There is no standalone `mergewatch` CLI (`npx mergewatch@latest`). MergeWatch is managed with Docker Compose for self-hosted deployments and with `pnpm` + `sam` scripts for deploying the SaaS stack from the [mergewatch.ai repo](https://github.com/santthosh/mergewatch.ai).
+</Info>
 
 ## Self-Hosted: Docker Commands
 
-Self-hosted MergeWatch is managed entirely with Docker Compose. There is no CLI wizard for self-hosted deployments.
+Self-hosted MergeWatch runs from a single `docker-compose.yml` that starts the server, Postgres, and the dashboard.
 
 | Command | Description |
 | --- | --- |
@@ -23,156 +23,59 @@ Self-hosted MergeWatch is managed entirely with Docker Compose. There is no CLI 
 | `docker compose restart mergewatch` | Restart the MergeWatch server |
 
 <Tip>
-Use `docker compose pull && docker compose up -d` to upgrade to the latest version. Docker will recreate only the containers whose images have changed.
+Use `docker compose pull && docker compose up -d` to upgrade to the latest version. Docker recreates only containers whose images have changed.
 </Tip>
 
 ---
 
-## SaaS: CLI Commands
+## SaaS / AWS: Repository Scripts
 
-<Info>
-The MergeWatch CLI is currently available as part of the MergeWatch repository. A standalone npm package (`mergewatch`) is planned for a future release.
-</Info>
+Deploying the AWS stack (API Gateway + Lambda + DynamoDB + Bedrock) is done by cloning [mergewatch.ai](https://github.com/santthosh/mergewatch.ai) and running the scripts defined in `package.json`.
 
 ```bash
-npx mergewatch@latest <command>
+git clone https://github.com/santthosh/mergewatch.ai.git
+cd mergewatch.ai
+pnpm install
 ```
 
-| Command   | Description                                     |
-| --------- | ----------------------------------------------- |
-| `init`    | Run the SaaS setup wizard (create GitHub App, configure billing) |
-| `upgrade` | Upgrade your SaaS deployment to the latest version |
-| `health`  | Check the health of your SaaS stack             |
-| `logs`    | Tail CloudWatch Lambda logs                     |
-| `check`   | Verify all prerequisites                        |
-| `version` | Show installed CLI version                      |
+### Deploy scripts
 
----
+| Script | What it does |
+| --- | --- |
+| `pnpm run deploy` | Build and deploy the stack (defaults to `prod` stage) via `scripts/deploy.sh` |
+| `pnpm run deploy:dev` | Deploy to the `dev` stage |
+| `pnpm run deploy:staging` | Deploy to the `staging` stage |
+| `pnpm run deploy:guided` | Run `sam deploy --guided` for first-time setup |
+| `pnpm run setup-ssm` | Seed SSM parameters for GitHub App credentials and webhook secret |
+| `pnpm run setup-web` | Seed SSM parameters consumed by the dashboard |
 
-### init
+### Log tailing (SaaS)
 
-Run the interactive setup wizard for the SaaS deployment. This creates a GitHub App via manifest flow and configures your account.
+| Script | What it does |
+| --- | --- |
+| `pnpm run logs:webhook` | Tail the Webhook Lambda logs via `sam logs` |
+| `pnpm run logs:agent` | Tail the ReviewAgent Lambda logs via `sam logs` |
+
+For ad-hoc filtering, use the AWS SAM CLI directly:
 
 ```bash
-npx mergewatch@latest init
+sam logs --name mergewatch-review-agent-prod --stack-name mergewatch --tail --filter "ERROR"
+sam logs --name mergewatch-webhook-prod --stack-name mergewatch --tail --start-time "5min ago"
 ```
 
-#### Flags
+### Development scripts
 
-| Flag | Description | Default |
-| --- | --- | --- |
-| `--stage <name>` | Stack stage name | `prod` |
-| `--region <region>` | AWS region | `us-east-1` |
-| `--profile <name>` | AWS CLI profile to use | — |
-| `--yes` | Skip confirmation prompts | `false` |
+| Script | What it does |
+| --- | --- |
+| `pnpm dev` | Run all packages in watch mode (turbo) |
+| `pnpm build` | Build all packages |
+| `pnpm typecheck` | Typecheck all packages |
+| `pnpm test` | Run the full test suite |
+| `pnpm web:dev` | Start the dashboard locally (Next.js) |
 
 <Tip>
-Use `--yes` in CI/CD pipelines to skip all interactive prompts. Make sure all prerequisites pass `check` first.
+The repository requires **Node.js ≥ 20** and **pnpm 10.23.0** (pinned via `packageManager` in `package.json`).
 </Tip>
-
----
-
-### upgrade
-
-Deploys the latest version of the SaaS stack and runs a health check.
-
-```bash
-npx mergewatch@latest upgrade
-```
-
-<Note>
-The upgrade command preserves your existing configuration. It applies only infrastructure changes.
-</Note>
-
----
-
-### health
-
-Check the health of your deployed SaaS stack.
-
-```bash
-npx mergewatch@latest health
-```
-
-#### Flags
-
-| Flag | Description | Default |
-| --- | --- | --- |
-| `--stage <name>` | Stage to check | `prod` |
-| `--region <region>` | AWS region | — |
-| `--json` | Output as JSON (for scripting) | `false` |
-
-<CodeGroup>
-```bash Human-readable output
-npx mergewatch@latest health --stage prod
-```
-
-```bash JSON output
-npx mergewatch@latest health --stage prod --json
-```
-</CodeGroup>
-
----
-
-### logs
-
-Tail CloudWatch Lambda logs in real time. This is a SaaS-only command — self-hosted users should use `docker compose logs` instead.
-
-```bash
-npx mergewatch@latest logs
-```
-
-#### Flags
-
-| Flag | Description | Default |
-| --- | --- | --- |
-| `--stage <name>` | Stage | `prod` |
-| `--region <region>` | AWS region | — |
-| `--function <name>` | `webhook` or `agent` | `agent` |
-| `--since <time>` | e.g., `5m`, `1h`, `2024-01-01` | — |
-| `--filter <str>` | CloudWatch filter pattern | — |
-
-<CodeGroup>
-```bash Tail agent logs
-npx mergewatch@latest logs --function agent --since 5m
-```
-
-```bash Filter for errors
-npx mergewatch@latest logs --filter "ERROR" --since 1h
-```
-
-```bash Webhook logs
-npx mergewatch@latest logs --function webhook --since 30m
-```
-</CodeGroup>
-
----
-
-### check
-
-Verifies that all prerequisites are installed and configured for a SaaS deployment:
-
-- **Node.js** — required runtime
-- **AWS CLI** — required for credential management
-- **AWS credentials** — valid credentials in the current profile
-
-```bash
-npx mergewatch@latest check
-```
-
-<Warning>
-If any check fails, `init` and `upgrade` will refuse to proceed. Fix the reported issues before continuing.
-</Warning>
-
----
-
-### version
-
-Prints the currently installed CLI version.
-
-```bash
-npx mergewatch@latest version
-```
 
 ---
 
