@@ -10,14 +10,14 @@ MergeWatch is an open-source GitHub App that reviews pull requests using a multi
 | | **MergeWatch** | **Greptile** | **CodeRabbit** |
 |---|---|---|---|
 | **Source** | Open source (AGPL v3) | Closed source | Closed source |
-| **Hosting** | Self-hosted (Docker, any cloud) or SaaS | Self-hosted available (Docker, any cloud) | Self-hosted available (Enterprise, 500-seat min, $15K+/mo) |
-| **Pricing** | No per-seat pricing — pay your LLM provider | Base platform fee + usage-based pricing | $24--$30/seat/month (annual vs monthly) |
+| **Hosting** | Self-hosted (Docker, any cloud) or SaaS | Enterprise self-host in AWS | Enterprise self-host only (500-seat minimum) |
+| **Pricing** | No per-seat pricing — pay your LLM provider | $30/seat/month + $1 per review over 50 | $24/seat/month Pro, $48/seat/month Pro Plus (annual) |
 | **Review approach** | Multi-agent parallel pipeline | Full-codebase graph + multi-hop analysis | AI review + 40+ linter integrations |
 | **Model control** | You choose the LLM provider and model | Bring-your-own-LLM (self-hosted) | Vendor-controlled (SaaS); configurable on self-hosted |
 | **Minimum commitment** | None | None stated | 500 seats for self-hosting |
 
 <Note>
-Competitor pricing and features were last verified in March 2025. Visit each vendor's website for current information.
+Competitor pricing and features were last verified in April 2026. Visit each vendor's website for current information. For a full breakdown across eight tools, see [Comparisons](/comparisons/overview).
 </Note>
 
 ## Key differentiators
@@ -97,17 +97,14 @@ The managed SaaS runs on a serverless stack in MergeWatch's AWS account:
 
 Configuration lives in a `.mergewatch.yml` file at the root of each repository. The [dashboard](/dashboard/overview) provides a UI for monitoring reviews, managing repos, and adjusting settings.
 
-<Accordion title="How is this different from CodeRabbit?">
-  Both tools review PRs with AI. The differences are structural:
-
-  **Where your code goes.** CodeRabbit's SaaS sends your code to their servers. Enterprise self-hosting exists but requires a 500-seat minimum at $15K+/month. MergeWatch self-hosts via a single `docker-compose up` with no seat minimum — code never leaves your infrastructure.
-
-  **How you pay.** CodeRabbit charges $24--$30/seat/month depending on billing term. MergeWatch has no per-seat fee. You pay your own LLM provider directly, which scales with usage, not team size.
-
-  **Source availability.** CodeRabbit is closed source. MergeWatch is AGPL v3 — you can read every line of the review logic, audit exactly what runs on your code, and contribute improvements.
-
-  **Model choice.** On CodeRabbit SaaS, the vendor controls model selection. MergeWatch lets you choose any LLM provider — Anthropic, LiteLLM (100+ providers), Amazon Bedrock, or Ollama — and swap models at any time.
-</Accordion>
+<CardGroup cols={2}>
+  <Card title="Full comparisons" icon="scale-balanced" href="/comparisons/overview">
+    Side-by-side breakdown of MergeWatch against CodeRabbit, Greptile, GitHub Copilot code review, OpenAI Codex, Claude Code, Cursor BugBot, and Qodo Merge — sourced from each vendor's own docs.
+  </Card>
+  <Card title="Feature matrix" icon="list-check" href="/comparisons/feature-matrix">
+    Checkmark grid across ~25 features — licensing, deployment, LLM flexibility, review pipeline, triggers, and pricing.
+  </Card>
+</CardGroup>
 
 ---
 
