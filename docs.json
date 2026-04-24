@@ -17,6 +17,10 @@
   "navbar": {
     "links": [
       {
+        "label": "Compare",
+        "href": "https://docs.mergewatch.ai/comparisons/overview"
+      },
+      {
         "label": "GitHub",
         "href": "https://github.com/santthosh/mergewatch.ai"
       }
@@ -127,6 +131,31 @@
               "reference/changelog",
               "reference/faq",
               "reference/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Comparisons",
+        "groups": [
+          {
+            "group": "Compare",
+            "pages": [
+              "comparisons/overview",
+              "comparisons/feature-matrix"
+            ]
+          },
+          {
+            "group": "Tool by tool",
+            "pages": [
+              "comparisons/coderabbit",
+              "comparisons/greptile",
+              "comparisons/github-copilot",
+              "comparisons/claude-code",
+              "comparisons/openai-codex",
+              "comparisons/cursor-bugbot",
+              "comparisons/qodo",
+              "comparisons/other-tools"
             ]
           }
         ]
