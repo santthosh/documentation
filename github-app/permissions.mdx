@@ -52,6 +52,7 @@ MergeWatch subscribes to the following webhook events. Each event triggers a spe
 | `pull_request` | Triggers the review pipeline on `opened`, `synchronize`, `ready_for_review`, and `reopened`. |
 | `issue_comment` | Listens for `@mergewatch` mentions in PR comments (`@mergewatch review`, `@mergewatch summary`, or free-form respond mode). |
 | `pull_request_review_comment` | Detects when a human replies inside a review-comment thread that MergeWatch started, so the bot can reply inline. Only `created` actions with an `in_reply_to_id` are handled. |
+| `check_run` | Listens for `rerequested` so reviewers can re-run a MergeWatch review by clicking the **Re-run** button on the check in GitHub's Checks UI. |
 | `installation` | Tracks when the app is installed or uninstalled so MergeWatch can provision or clean up installation records. |
 
 See [Webhook Events](/github-app/webhook-events) for the exact action-level handling per event.

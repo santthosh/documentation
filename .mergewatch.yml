@@ -1,0 +1,9 @@
+# MergeWatch configuration — see https://docs.mergewatch.ai/configuration/mergewatch-yml
+#
+# This is a docs-only repository. By default MergeWatch PR-skips PRs whose
+# changed files are all docs (*.md, *.mdx). includePatterns opts those PRs
+# back into review so doc accuracy gets the same checks as code changes.
+
+includePatterns:
+  - "**/*.md"
+  - "**/*.mdx"
