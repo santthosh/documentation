@@ -15,6 +15,7 @@ MergeWatch subscribes to the following GitHub webhook events:
 | `pull_request` | `ready_for_review` | Triggers a full review when a draft PR is marked as ready. Looks up the existing MergeWatch comment to update in place. |
 | `issue_comment` | `created` | Checks for `@mergewatch` mention. Runs `review`, `summary`, or free-form `respond` depending on the comment body. Ignores bot senders to prevent reply loops. |
 | `pull_request_review_comment` | `created` | When a human replies inside a review-comment thread with `in_reply_to_id` set, MergeWatch queues an `inline_reply` job. Used for in-thread Q&A on MergeWatch findings. |
+| `check_run` | `rerequested` | A reviewer clicked the **Re-run** button on the MergeWatch check in GitHub's Checks UI. MergeWatch re-runs the review pipeline against the current head SHA. |
 | `installation` | `created`, `added` | Upserts the installation and its repository records in the database. |
 | `installation` | `deleted`, `removed` | Logged, then acknowledged with `200 OK`. Installation rows remain so historical reviews stay queryable. |
 

@@ -39,7 +39,7 @@ MergeWatch triggers a review when it receives any of the following GitHub webhoo
 MergeWatch deliberately skips reviews in the following situations:
 
 - **Draft PRs** — Skipped by default. Set `rules.skipDrafts: false` in your `.mergewatch.yml` to review drafts.
-- **All changed files match `ignorePatterns`** — If every file in the PR matches a pattern in `rules.ignorePatterns`, the entire PR is skipped.
+- **All changed files are built-in trivial** — If every file in the PR matches MergeWatch's built-in trivial-paths list (lock files, docs, build artifacts, editor/CI config), the PR is skipped. Use `includePatterns` to opt specific paths back in.
 - **PR exceeds `rules.maxFiles` limit** — PRs with more changed files than the configured `maxFiles` value (default: 50) are skipped with a comment explaining why.
 - **Repository is paused** — If MergeWatch is paused for the repository in the [dashboard](/dashboard/settings), no reviews run until it is resumed.
 </Warning>
@@ -73,13 +73,17 @@ If you see outdated inline comments after a re-review, check the timestamp. The 
 
 ## Re-triggering a review
 
-To manually re-trigger a review, post a comment on the pull request:
+There are two ways to manually re-trigger a review:
+
+**Comment on the pull request:**
 
 ```
 @mergewatch review
 ```
 
-This works in all scenarios:
+**Click the GitHub Checks UI "Re-run" button** on the MergeWatch check run. MergeWatch listens for `check_run.rerequested` and re-runs the same review pipeline that produced the original check.
+
+Both paths work in all scenarios:
 
 - Even when `autoReview: false` is set in your configuration
 - After a failed review to retry

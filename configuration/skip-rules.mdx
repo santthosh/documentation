@@ -45,18 +45,20 @@ Built-in patterns include: lock files (`*.lock`, `package-lock.json`, `yarn.lock
 
 ### File-level diff exclusion (configurable)
 
-`excludePatterns` (top-level) and `rules.ignorePatterns` both filter **individual files out of the diff** sent to agents. They do **not** cause PR-level skipping — the PR is still reviewed as long as at least one non-built-in-skipped file is present.
+`excludePatterns` (top-level) filters **individual files out of the diff** sent to agents. It does **not** cause PR-level skipping — the PR is still reviewed as long as at least one non-built-in-skipped file is present.
 
 ```yaml .mergewatch.yml
 version: 1
 excludePatterns:
   - "**/*.generated.ts"
   - "**/fixtures/**"
-rules:
-  ignorePatterns:
-    - "vendor/**"
-    - "third_party/**"
+  - "vendor/**"
+  - "third_party/**"
 ```
+
+<Note>
+`rules.ignorePatterns` is deprecated. New configurations should use top-level `excludePatterns` only — entries under `rules.ignorePatterns` are folded into `excludePatterns` at parse time and a one-time deprecation warning is emitted.
+</Note>
 
 Patterns use standard glob syntax relative to the repository root:
 
@@ -66,6 +68,22 @@ Patterns use standard glob syntax relative to the repository root:
 | `dist/**` | All files under the `dist/` directory |
 | `docs/*.md` | Markdown files directly in the `docs/` directory |
 | `**/*.generated.ts` | Generated TypeScript files at any depth |
+
+### Force-include with `includePatterns`
+
+Use `includePatterns` to opt PRs back into review when every changed file would otherwise be classified as built-in trivial. This operates at the PR-skip layer, **not** the diff-filter layer — it doesn't change what gets sent to agents on a PR that's already being reviewed.
+
+Common uses: review docs changes inside a security-sensitive directory, force review of a top-level `SECURITY.md`, or treat a critical config path as non-trivial.
+
+```yaml .mergewatch.yml
+version: 1
+includePatterns:
+  - "SECURITY.md"
+  - "docs/policy/**"
+  - ".github/workflows/deploy.yml"
+```
+
+A PR that touches only files matching `includePatterns` is reviewed even though it would otherwise be PR-skipped as docs-only or config-only.
 
 ## Label-based skip
 
@@ -109,7 +127,6 @@ If you want MergeWatch to review every PR regardless of draft status, labels, or
 version: 1
 rules:
   skipDrafts: false
-  ignorePatterns: []
   ignoreLabels: []
   maxFiles: 10000
 excludePatterns: []

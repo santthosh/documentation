@@ -177,6 +177,22 @@ After all agents complete, the orchestrator:
 | 2 | 2 or more critical findings | Critical findings present. Do not merge without addressing. |
 | 1 | 3+ critical findings or a major security vulnerability | High-confidence critical findings. Merge blocked. |
 
+## Re-review delta caption
+
+When a PR is re-reviewed (a new commit on a PR MergeWatch has already reviewed), a separate **delta-caption** pass runs after the orchestrator. It compares the new findings against the prior review and produces a single sentence describing what shifted on this commit — *"Resolved two security findings; introduced a new error-handling warning"*. The caption is rendered between the delta strip and the merge-readiness verdict in the review comment.
+
+The delta-caption agent runs only on re-reviews and only when at least one finding was resolved or newly introduced. If both lists are empty (carried-over findings only) the agent returns nothing and no caption is rendered.
+
+## Agent-authored PRs
+
+MergeWatch detects pull requests authored by coding agents (Claude Code, Cursor, Codex, etc.) using commit trailers, branch prefixes, and labels. When a PR is detected as agent-authored:
+
+- A stricter prompt suffix is injected into every finding-producing agent. It tells the model to be extra suspicious of hallucinated APIs, no-op tests, dead branches, and references to deprecated patterns.
+- Iteration count is tracked across re-reviews, and a "reviewer whisper" line is added to the comment when the agent has taken multiple rounds to converge.
+- The configured `passThreshold` (default `noCritical`) gates whether the PR is considered passing.
+
+See the [`agentReview` config block](/configuration/mergewatch-yml#agent-authored-prs) for detection rules and overrides.
+
 ## Codebase awareness
 
 MergeWatch supports **agentic file fetching** for cross-file context. When enabled, agents can request additional files from the repository via the GitHub API to understand surrounding context — such as imported modules, type definitions, or test files — beyond what the PR diff includes.
