@@ -85,7 +85,7 @@ There are two ways to manually re-trigger a review:
 
 Both paths work in all scenarios:
 
-- Even when `autoReview: false` is set in your configuration
+- Even when `autoReview: false` is set in your configuration. In this mode MergeWatch posts a neutral check run titled *"Auto-review is disabled for this repository"* with a one-line instruction to comment `@mergewatch review` — see [Auto-review off](/configuration/skip-rules#auto-review-off).
 - After a failed review to retry
 - After pushing new commits, if you do not want to wait for the automatic trigger
 - On PRs that were previously skipped (the skip rules are re-evaluated)

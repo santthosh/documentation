@@ -25,7 +25,7 @@ The following conditions cause MergeWatch to skip a pull request automatically:
 |---|---|---|
 | Draft PR | Skip | Set `rules.skipDrafts: false` |
 | PR exceeds `rules.maxFiles` (default 50) | Skip | Raise `rules.maxFiles` |
-| `rules.autoReview: false` and review not @mergewatch-triggered | Skip | Set `rules.autoReview: true` or mention `@mergewatch` |
+| `rules.autoReview: false` and review not @mergewatch-triggered | Skip with a user-actionable check run (see [Auto-review off](#auto-review-off)) | Set `rules.autoReview: true` or mention `@mergewatch` |
 | PR has a label in `rules.ignoreLabels` (default: `skip-review`) | Skip | Remove the label or adjust `ignoreLabels` |
 | All changed files match built-in trivial patterns (lock files, `*.md`, `dist/**`, `build/**`, `node_modules/**`, minified files, CI/editor config) | Skip | Pass the PR through by changing a non-trivial file too |
 
@@ -84,6 +84,21 @@ includePatterns:
 ```
 
 A PR that touches only files matching `includePatterns` is reviewed even though it would otherwise be PR-skipped as docs-only or config-only.
+
+## Auto-review off
+
+When `rules.autoReview: false` is set, MergeWatch does not run the review pipeline on PR open or synchronize events — but it does post a **user-actionable check run** to the PR's merge box so the author knows reviews are intentionally off and how to trigger one:
+
+```text
+✓ Auto-review is disabled for this repository
+   Comment @mergewatch review on this PR to run a review.
+```
+
+The check run uses the `neutral` conclusion so it does not block branch protection. Mention-triggered reviews (`@mergewatch review`, `@mergewatch summary`) bypass the gate and post a normal review comment as usual.
+
+<Note>
+This user-actionable copy is specific to the `autoReviewOff` skip kind. Other rule-based skips (drafts, label-ignored, `maxFiles` exceeded, `reviewOnMention: false`) post a generic "Review skipped" check run with the detailed reason as summary — those are intentional skips that don't need user-facing instructions.
+</Note>
 
 ## Label-based skip
 
